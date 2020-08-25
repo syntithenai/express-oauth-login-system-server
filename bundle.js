@@ -166,6 +166,7 @@ function getLoginSystemRouter(config) {
                             console.log(token);  
                             //// SET NEW REFRESH TOKEN
                             res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000});
+                            res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
                             //// RETURN TOKEN ?
                            res.json(token);
                         });
@@ -349,7 +350,9 @@ function getLoginSystemRouter(config) {
                  * SIGN OUT
                  ********************/
                 router.post('/logout',cors(), function(req, res) {
+                    console.log('LOGOUT');
                     res.clearCookie('refresh_token');
+                    res.clearCookie('media_token');
                     res.send({});
                 });
                 
