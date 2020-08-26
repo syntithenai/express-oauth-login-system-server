@@ -8,7 +8,6 @@ function getModel(db) {
     const OAuthRefreshToken = db.OAuthRefreshToken;
 
     function getAccessToken(accessToken) {
-      //console.log('getAccessToken', accessToken);
       return OAuthAccessToken
         .findOne({ accessToken })
         .populate('user')
@@ -21,7 +20,6 @@ function getModel(db) {
     }
 
     function getClient(clientId, clientSecret) {
-      //console.log('getClient', clientId, clientSecret);
       const query = { clientId };
       if (clientSecret) {
         query.clientSecret = clientSecret;
@@ -40,7 +38,6 @@ function getModel(db) {
 
 
     function getUser(username, password) {
-      // TODO: Hashing of password
       return User
         .findOne({ username, password })
         .lean()
@@ -51,7 +48,6 @@ function getModel(db) {
     }
 
     function revokeAuthorizationCode(code) {
-      //console.log('revokeAuthorizationCode', code);
       return OAuthAuthorizationCode.findOneAndRemove({ code: code.code })
         .then(removed => !!removed)
         .catch((err) => {
@@ -60,7 +56,6 @@ function getModel(db) {
     }
 
     function revokeToken(token) {
-      //console.log('revokeToken', token);
       return OAuthRefreshToken.findOneAndRemove({ refreshToken: token.refreshToken })
         .then(removed => !!removed)
         .catch((err) => {
@@ -70,7 +65,6 @@ function getModel(db) {
 
 
     function saveToken(token, client, user) {
-      //console.log('saveToken', token, client, user);
       return Promise.all([
         OAuthAccessToken.create({
           accessToken: token.accessToken,
@@ -88,9 +82,7 @@ function getModel(db) {
         }) : Promise.resolve()
       ])
         .then(() => {
-            //console.log(['saved token',client,user,token])
             return _.assign({ client, user }, token)
-            //console.log(['really saved token'])
         })
         .catch((err) => {
           console.log('revokeToken - Err: ', err);
@@ -98,7 +90,6 @@ function getModel(db) {
     }
 
     function getAuthorizationCode(code) {
-      //console.log('getAuthorizationCode', code);
       return OAuthAuthorizationCode
         .findOne({ code })
         .populate('user')
@@ -117,7 +108,6 @@ function getModel(db) {
     }
 
     function saveAuthorizationCode(code, client, user) {
-      //console.log('saveAuthorizationCode', code, client, user);
       return OAuthAuthorizationCode
         .create({
           expiresAt: code.expiresAt,
@@ -137,7 +127,6 @@ function getModel(db) {
     }
 
     function getUserFromClient(client) {
-      //console.log('getUserFromClient', client);
       return User.findById(client.user)
         .lean()
         .then(dbUser => dbUser)
@@ -147,7 +136,6 @@ function getModel(db) {
     }
 
     function getUserFromAccessToken(token) {
-         //console.log('getUserFromAccessToken', token);
        return OAuthAccessToken
         .findOne({ accessToken:token })
         .populate('user')
@@ -167,7 +155,6 @@ function getModel(db) {
     }
 
     function getRefreshToken(refreshToken) {
-      //console.log('getRefreshToken', refreshToken);
       return OAuthRefreshToken
         .findOne({ refreshToken })
         .populate('user')
@@ -209,9 +196,6 @@ function getModel(db) {
     }
 
     return {
-       //generateAccessToken, 
-       //generateAuthorizationCode, 
-       //generateRefreshToken, 
       getAccessToken,
       getAuthorizationCode,
       getClient,

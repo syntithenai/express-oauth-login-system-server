@@ -41,7 +41,6 @@ function ExpressOAuthServer(options) {
 
 ExpressOAuthServer.prototype.authenticate = function(options) {
   var that = this;
-
   return function(req, res, next) {
     var request = new Request(req);
     var response = new Response(res);
@@ -114,12 +113,7 @@ ExpressOAuthServer.prototype.token = function(options) {
       })
       .tap(function(token) {
         res.locals.oauth = { token: token };
-        console.log('token req')
-        console.log(token.refreshToken)
-        //if (token && token.refreshToken) {
-            //console.log('token req COOKIE')
-            //res.cookie('refresh_token',token.refreshToken,{domain:'localhost'})
-        //} 
+        
         if (this.continueMiddleware) {
           next();
         }

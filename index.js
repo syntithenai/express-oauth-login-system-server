@@ -1,4 +1,5 @@
 var express = require('express');
+const {ObjectId} = require('mongodb');
 var fetch = require('node-fetch');
 const mustache = require('mustache');
 const crypto = require("crypto"); 
@@ -12,11 +13,11 @@ const cookieParser = require('cookie-parser');
 const bluebird = require('bluebird');
 const OAuthServer = require('./express-oauth-server')
 const database = require('./database');
-const model = require('./model')(database)
+
 var cors = require('cors')
 
-
 function getLoginSystemRouter(config) {
+    const model = require('./model_jwt')(database,config)
     return new Promise(function(resolve, reject) {
         var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken} = require('./userHelpers')(config)
         const {sendWelcomeEmail} = require('./utils')(config)
@@ -26,7 +27,6 @@ function getLoginSystemRouter(config) {
           accessTokenLifetime: 900, // 15 minutes
           allowEmptyState: true,
           allowExtendedTokenAttributes: true,
-          //continueMiddleware: true
         })
             
         var passport = require('./passport')(config,database)
@@ -41,19 +41,26 @@ function getLoginSystemRouter(config) {
             // INITIALISE MONGOOSE AND RAW MONGODB CONNECTIONS
             var ObjectId = require('mongodb').ObjectID;
 
-            //const User F= require('./User');
-
             mongoose.connect(config.databaseConnection + config.database,{useNewUrlParser: true }).then(() => {
-                console.log('Mongoose Connected');
                 // INITIALSE OAUTH SERVER - create client if not exists
                 database.OAuthClient.findOne({clientId: config.clientId}).then(function(client) {
-                    let clientFields = 	{clientId: config.clientId, clientSecret:config.clientSecret,name:config.clientName,website_url:config.clientWebsite,privacy_url:config.clientPrivacyPage,redirectUris:[],image:config.clientImage};
+                    let clientFields = 	{
+                        clientId: config.clientId, 
+                        clientSecret:config.clientSecret,
+                        name:config.clientName,
+                        website_url:config.clientWebsite,
+                        privacy_url:config.
+                        clientPrivacyPage,
+                        redirectUris:[],
+                        image:config.clientImage
+                    };
                     if (client!= null) {
                         // OK
                         database.OAuthClient.update({clientId:config.clientId},clientFields);
                     } else {
                         let client = new database.OAuthClient(clientFields);
                         client.save().then(function(r) {
+                            
                         });
                     }
                 }).catch(function(e) {
@@ -69,7 +76,6 @@ function getLoginSystemRouter(config) {
                 
                 router.post('/token', 
                     (req,res,next) => {
-                        console.log(['POST TO TOKEN',JSON.stringify(req.body)])
                       next()
                     },
                     oauthServer.token({
@@ -77,28 +83,9 @@ function getLoginSystemRouter(config) {
                         'authorization_code': false,
                       }
                     })
-                    //,
-                    //(req,res,next) => {
-                        //if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.refreshToken) {
-                           //console.log('RT:'+res.locals.oauth.token.refreshToken);
-                           //res.cookie('refresh_token',res.locals.oauth.token.refreshToken) //,{ expires: new Date(Date.now() + 900000), httpOnly: true}); //, secure: true 
-                       //}   
-                    //}
                 )
                 
-                 //router.post('/token', (req,res,next) => {
-                     //console.log('SET COOKIE')
-                      //res.cookie('refresh_token',{'FF':'jjj'})
-                   //if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.refreshToken) {
-                       //console.log(res.locals.oauth.token.refreshToken);
-                       //res.cookie('refresh_token','jjj') //+res.locals.oauth.token.refreshToken) //,{ expires: new Date(Date.now() + 900000), httpOnly: true}); //, secure: true 
-                   //}   
-                 //})
-                 
-                 
-                 
                 // set csrf jeader
-                
                 router.use('/',(req, res, next) => {
                   csrf.setToken(req, res, next)
                 });
@@ -154,15 +141,11 @@ function getLoginSystemRouter(config) {
                     }
                   }
                 }))
-//d
                
                  router.get('/refresh_token', (req,res,next) => {
                      var token={}
-                     console.log(['TOKEN refresh',JSON.stringify(req.cookies)])
                      if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
                          requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
-                            console.log('REFRESHED')
-                            console.log(token)  
                             //// SET NEW REFRESH TOKEN
                             res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
                             res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
@@ -171,11 +154,7 @@ function getLoginSystemRouter(config) {
                         })
                      } else {
                          res.json({})
-                     }
-                   //if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.refreshToken) {
-                       //console.log(res.locals.oauth.token.refreshToken);
-                       //res.cookie('refresh_token',res.locals.oauth.token.refreshToken,{ expires: new Date(Date.now() + 900000), httpOnly: true}); //, secure: true 
-                   //}   
+                     } 
                  })
                  
                  
@@ -190,7 +169,7 @@ function getLoginSystemRouter(config) {
                     passport.authenticate('local', function(err, user, info) {
                         loginSuccessJson(user,res,function(err,finalUser) {
                             if (err) console.log(err);
-                            res.json(finalUser);
+                            res.json({error:err,user:finalUser});
                         })
                     })(req, res, next);
                 })  
@@ -258,17 +237,17 @@ function getLoginSystemRouter(config) {
                 /********************
                  * SIGNUP
                  ********************/
-                router.post('/signup', cors(), csrfCheck,function(req, res) {
+                router.post('/signup', cors(),function(req, res) {
                         if (req.body.username && req.body.username.length > 0 && req.body.name && req.body.name.length>0 && req.body.avatar && req.body.avatar.length>0 && req.body.password && req.body.password.length>0 && req.body.password2 && req.body.password2.length>0) {
                         if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.toLowerCase().trim()) >= 0 )) {
                             
                             if (req.body.password2 != req.body.password)  {
-                                res.send({message:'Passwords do not match.'});
+                                res.send({error:'Passwords do not match.'});
                             } else {
                                 database.User.findOne({username:req.body.username.trim()}, function(err, ditem) {
                                     if (err) console.log(err)
                                     if (ditem) {
-                                        res.send({'warning':'There is already a user registered with the email address '+req.body.username});
+                                        res.send({'error':'There is already a user registered with the email address '+req.body.username});
                                     } else {
                                         let item = {}
                                         config.userFields.map(function(fieldName) {
@@ -282,7 +261,7 @@ function getLoginSystemRouter(config) {
                                         }
                                         database.User.findOne({avatar:{$eq:req.body.avatar.trim()}}).then(function(avUser) {
                                                 if (avUser!=null && avUser.length>0) {
-                                                    res.send({message:'Avatar name is already taken, try something different.'});
+                                                    res.send({error:'Avatar name is already taken, try something different.'});
                                                 } else {
                                                     item.signup_token =  generateToken();
                                                     item.signup_token_timestamp =  new Date().getTime();
@@ -299,10 +278,10 @@ function getLoginSystemRouter(config) {
                                 });
                             }
                         } else {
-                            res.send({message:'Sorry. You are not allowed to register and login.'});
+                            res.send({error:'Sorry. You are not allowed to register and login.'});
                         }
                     } else {
-                        res.send({message:'Missing required information.'});
+                        res.send({error:'Missing required information.'});
                     }
                 });
                   
@@ -329,18 +308,18 @@ function getLoginSystemRouter(config) {
                                             });
                                         });
                                    } else {
-                                       res.send({err:'token timeout. restart request'})
+                                       res.send({error:'Token timeout. Refresh the page and try again'})
                                    }
                                 } else {
-                                    res.send({message:'No matching registration'} );
+                                    res.send({message:'Failed to find your confirm code. You may have already confirmed your registration'} );
                                 }
                            // }
                         }).catch(function(e) {
                             console.log(['failed',e]);
-                            res.send({message:'failed'});
+                            res.send({error:e});
                         });
                     } else {
-                            res.send({message:'missing code	'})
+                            res.send({error:'Invalid request missing code	'})
                     }
                 })
 
@@ -348,17 +327,18 @@ function getLoginSystemRouter(config) {
                 /********************
                  * SIGN OUT
                  ********************/
-                router.post('/logout',cors(), function(req, res) {
-                    console.log('LOGOUT')
-                    res.clearCookie('refresh_token');
-                    res.clearCookie('media_token');
-                    res.send({})
+                router.post('/logout',cors(), oauthServer.authenticate(), function(req, res) {
+                    if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user && res.locals.oauth.token.user._id)  {
+                        database.OAuthRefreshToken.deleteMany({user:ObjectId(res.locals.oauth.token.user._id)}).then(function() {
+                        })
+                    }
+                    res.json({message:'Logged out'})
                 });
                 
                 /********************
                  * SIGN IN
                  ********************/
-                router.post('/signin',cors(),csrfCheck, function(req, res) {
+                router.post('/signin',cors(), function(req, res) {
                     if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
                         var loginPassword = req.body.password.trim()
                         if (config.encryptedPasswords) {
@@ -369,17 +349,17 @@ function getLoginSystemRouter(config) {
                                 if (user != null) {
                                    loginSuccessJson(user,res,function(err,finalUser) {
                                         if (err) console.log(err);
-                                        res.json(finalUser); 
+                                        res.json({user: finalUser}); 
                                     })
                                 } else {
-                                    res.send({message:'No matching user'} );
+                                    res.send({error:'No matching user'} );
                                 }
                         }).catch(function(e) {
                             console.log(e);
-                            res.send({message:'failed'});
+                            res.send({error:e});
                         });		
                     } else {
-                         res.send({message:'Missing required login credentials'});
+                         res.send({error:'Missing required login credentials'});
                     }
                 });
 
@@ -388,16 +368,16 @@ function getLoginSystemRouter(config) {
                 /********************
                  * REQUEST  PASSWORD RECOVERY EMAIL
                  ********************/
-                router.post('/recover',cors(), csrfCheck,function(req, res) {
+                router.post('/recover',cors(), function(req, res) {
                     if (req.body.email && req.body.email.length > 0 && req.body.code && req.body.code.length > 0) {
                         if (!req.body.password || req.body.password.length==0 || !req.body.password2 || req.body.password2.length==0) {
-                            res.send({warning_message:'Empty password is not allowed'});
+                            res.send({error:'Empty password is not allowed'});
                         } else if (req.body.password2 != req.body.password)  {
-                            res.send({warning_message:'Passwords do not match'});
+                            res.send({error:'Passwords do not match'});
                         } else {
                             database.User.findOne({username:req.body.email}, function(err, user) {
                               if (err) {
-                                  res.send({warning_message:err,here:1});
+                                  res.send({error:err,here:1});
                               } else if (user!=null) {
                                   if (config.encryptedPasswords) {
                                       user.tmp_password = md5(req.body.password)
@@ -433,17 +413,17 @@ function getLoginSystemRouter(config) {
                                                  mustache.render(mailTemplate,{link:link,name:user.name}),
                                                  mustache.render(mailTemplateText,{link:link,name:user.name})
                                               );  
-                                      user.warning_message="Sent recovery email";
-                                      res.send({warning_message: "Sent recovery email"});
+                                      //user.message="Sent recovery email";
+                                      res.send({message: "Sent recovery email"});
                                   });  
                                   
                               } else {
-                                  res.send({warning_message:'No matching email address found for recovery'});
+                                  res.send({error:'No matching email address found for recovery'});
                               }
                             }); 
                         }
                     } else {
-                        res.send({warning_message:'Missing required information.'});
+                        res.send({error:'Missing required information.'});
                     }
                 });
                 /********************
@@ -465,15 +445,15 @@ function getLoginSystemRouter(config) {
                                             if (err) console.log(err);
                                             res.redirect(config.loginSuccessRedirect);
                                         })
-                                      });	
+                                      });
                                    } else {
-                                          res.send('token timeout restart request' );
+                                          res.send('Token timeout restart request');
                                    }
                                 } else {
-                                    res.send('no matching registration' );
+                                    res.send('Invalid code. You may have already confirmed your password update.');
                                 }
                             }).catch(function(e) {
-                                res.send('failed');
+                                res.send({error:e });
                             });		
                 })
 
@@ -482,42 +462,26 @@ function getLoginSystemRouter(config) {
                 /********************
                  * Update the access token and return the current user(+token) as JSON
                  ********************/
-                 //
-                router.post('/me',function(req,res) {
-                    console.log(['ME'])
+                router.post('/me',cors(), oauthServer.authenticate(), function(req,res) {
                     var code = ''
-                    if (req.headers.authorization) {
-                        console.log(['ME HEADER'])
-                        if (req.headers.authorization.slice(0,7) === "Bearer ") {
-                            code = req.headers.authorization.slice(7)
-                            console.log(['ME CODE',code])
-                            model.getUserFromAccessToken(code).then(function(user) {
-                                console.log(['ME CODE',user])
-                                if (user && user._id) {
-                                    //loginSuccessJson(user,res,function(err,finalUser) {
-                                        //if (err) console.log(err);
-                                        res.json(user); 
-                                    //})
-                                }
-                            })
-                            
-                        }
-                    } 
+                    var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {}
+                    res.json(loginUser)
                     
                 })
 
                 /********************
                  * SAVE USER, oauthMiddlewares.authenticate
                  ********************/
-                 //
-                router.post('/saveuser',cors(),csrfCheck,oauthServer.authenticate(), function(req, res) {
-                    if (req.body._id && req.body._id.length > 0) {
+                router.post('/saveuser',cors(), oauthServer.authenticate(), function(req, res) {
+                    var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {}
+                    if (req.body._id && req.body._id.length > 0 && loginUser._id && loginUser._id === req.body._id) {
                         if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0 && req.body.password2 != req.body.password)  {
-                            res.send({warning_message:'Passwords do not match'});
+                            res.send({error:'Passwords do not match'});
                         } else {
                             database.User.findOne(ObjectId(req.body._id), function(err, user) {
+                                
                               if (err) {
-                                  res.send({warning_message:err,here:2});
+                                  res.send({error:err});
                               } else if (user!=null) {
                                  config.userFields.map(function(fieldName) {
                                     let key = fieldName.trim();
@@ -538,27 +502,33 @@ function getLoginSystemRouter(config) {
                                   if (req.body.avatar && user.avatar != req.body.avatar) {
                                       database.User.findOne({avatar:{$eq:req.body.avatar}}, function(err, avUser) {
                                           if (avUser!=null) {
-                                              res.send({warning_message:"Avatar name is already taken, try something different."});
+                                              res.send({error:"Avatar name is already taken, try something different."});
                                           } else {
-                                              user.save().then(function(xres) {
-                                                  user.warning_message="Saved changes";
-                                                  res.send(user);
-                                              });  
+                                              if (user.username && user.username.length > 0 && user.name && user.name.length>0 && user.avatar && user.avatar.length>0) {
+                                                  user.save().then(function(res) {
+                                                      res.send({user, message:"Saved changes"});
+                                                  });  
+                                              } else {
+                                                  res.send({error:'Name and avatar cannot be empty'});
+                                              }
                                           }
                                       });
                                   } else {
-                                      user.save().then(function(xres) {
-                                          user.warning_message="Saved changes";
-                                          res.send(user);
-                                      });  
+                                      if (user.username && user.username.length > 0 && user.name && user.name.length>0 && user.avatar && user.avatar.length>0) {
+                                        user.save().then(function(xres) {
+                                          res.send({user, message:"Saved changes"});
+                                        });  
+                                    } else {
+                                         res.send({error:"Name and avatar cannot be empty"});
+                                    }
                                   }
                               } else {
-                                  res.send({warning_message:'ERROR: No user found for update'});
+                                  res.send({error:'Invalid save request cannot find user'});
                               }
                             }); 
                         }
                     } else {
-                        res.send({warning_message:'Missing required information.'});
+                        res.send({error:'No permission to save this user'});
                     }
                 });
 
@@ -582,7 +552,7 @@ function getLoginSystemRouter(config) {
                     error: err
                   });
                 });
-                resolve({router:router, authenticate: oauthServer.authenticate, csrf:csrf} )
+                resolve({router:router, authenticate: oauthServer.authenticate(), csrf:csrf} )
 
 
             }).catch((err) => {

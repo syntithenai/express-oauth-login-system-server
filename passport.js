@@ -1,8 +1,6 @@
-//let config = global.gConfig;
 var md5 = require('md5');
 const crypto = require("crypto"); 
 var faker = require('faker');
-//const database = require('./database');
 
 function generatePassport(config,database) {
 // CONFIGURE AND INITIALISE PASSPORT 

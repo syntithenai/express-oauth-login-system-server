@@ -16,7 +16,6 @@ function getUtilFunctions(config) {
           text: text,
           html: html,
         };
-        //ES6
         sgMail
           .send(msg)
           .then(() => {console.log('Sent email')}, error => {

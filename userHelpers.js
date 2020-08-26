@@ -5,11 +5,9 @@ function getUserHelpers(config) {
 
 // CALLBACK WHEN USER IS IDENTIFIED TO ADD TOKEN AND SET refresh COOKIE
             function loginSuccessJson(user,res,cb) {
-                //console.log(['SAVE USER',user]);
                 requestToken(user).then(function(userAndToken) {
                         let token = userAndToken.token;
                         if (token) {
-                            console.log(['RTA',token.refresh_token])
                             res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
                             res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
                             cb(null,Object.assign(sanitizeUser(userAndToken),{token:token}))
@@ -33,7 +31,6 @@ function getUserHelpers(config) {
                         'client_id':config.clientId,
                         'client_secret':config.clientSecret,
                     };
-                      console.log(['RQUEST TOKEN',params])
                       return fetch(config.authServer+"/token", {
                           method: 'POST',
                           headers: {
@@ -44,7 +41,6 @@ function getUserHelpers(config) {
                         }).then(function(response) {
                             return response.json();
                         }).then(function(token) {
-                            console.log(['req got token',token])
                             if (token && token.access_token && token.access_token.length > 0) {
                                 user.token = token;
                                 resolve(user);
@@ -68,7 +64,6 @@ function getUserHelpers(config) {
                         'client_id':config.clientId,
                         'client_secret':config.clientSecret
                       };
-                    //  console.log(['RQUEST TOKEN',params])
                       return fetch(config.authServer+"/token", {
                           method: 'POST',
                           headers: {
