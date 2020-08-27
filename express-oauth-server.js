@@ -109,7 +109,11 @@ ExpressOAuthServer.prototype.token = function(options) {
 
     return Promise.bind(that)
       .then(function() {
-        return this.server.token(request, response, options);
+          try {
+            return this.server.token(request, response, options);
+          } catch(e) {
+              return {}
+          }
       })
       .tap(function(token) {
         res.locals.oauth = { token: token };
@@ -148,8 +152,8 @@ var handleResponse = function(req, res, response) {
  */
 
 var handleError = function(e, req, res, response, next) {
-
   if (this.useErrorHandler === true) {
+      
     next(e);
   } else {
     if (response) {

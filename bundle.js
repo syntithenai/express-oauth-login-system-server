@@ -71,14 +71,15 @@ function getLoginSystemRouter(config) {
                 global.Promise = bluebird;
 
                 var router = express.Router();
-                router.use(bodyParser.json());
+                router.use(express.urlencoded());
+                router.use(express.json());
+
                 router.use(cookieParser());
-                router.use(bodyParser.urlencoded({ extended: false }));
                 router.use(passport.initialize());
                 
                 router.post('/token', 
                     (req,res,next) => {
-                      next();
+                        next();
                     },
                     oauthServer.token({
                       requireClientAuthentication: { // whether client needs to provide client_secret
@@ -350,17 +351,16 @@ function getLoginSystemRouter(config) {
                                 if (user != null) {
                                    loginSuccessJson(user,res,function(err,finalUser) {
                                         if (err) console.log(err);
-                                        res.json({user: finalUser}); 
+                                        res.redirect(config.loginSuccessRedirect);
                                     });
                                 } else {
-                                    res.send({error:'No matching user'} );
+                                    res.redirect(config.loginFailRedirect+"?fail=true");
                                 }
                         }).catch(function(e) {
-                            console.log(e);
-                            res.send({error:e});
+                            res.redirect(config.loginFailRedirect+"?fail=true");
                         });		
                     } else {
-                         res.send({error:'Missing required login credentials'});
+                         res.redirect(config.loginFailRedirect+"?fail=true");
                     }
                 });
 
@@ -410,7 +410,7 @@ function getLoginSystemRouter(config) {
 
                                                   `;
                                        var mailTemplate =  mustache.render(mailTemplate,{link:link,name:user.name});
-                                       utils.sendMail(config.mailFrom,req.body.email,"Update your password ",
+                                       utils.sendMail(config.mailFrom,req.body.email,config.mailForgotPasswordSubject,
                                                  mustache.render(mailTemplate,{link:link,name:user.name}),
                                                  mustache.render(mailTemplateText,{link:link,name:user.name})
                                               );  

@@ -31,7 +31,7 @@ function getUserHelpers(config) {
                         'client_id':config.clientId,
                         'client_secret':config.clientSecret,
                     };
-                      return fetch(config.authServer+"/token", {
+                      return fetch( config.authServer+"/token", {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',

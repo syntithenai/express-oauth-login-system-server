@@ -61,6 +61,7 @@ function getUtilFunctions(config) {
      
     function sendWelcomeEmail(token,name,username) {
         var link = config.authServer + '/doconfirm?code='+token;
+        
         var mailTemplate = config.signupEmailTemplate && config.signupEmailTemplate.length > 0  ? config.signupEmailTemplate : `<div>Hi {{name}}! <br/>
 
                 Welcome,<br/>
@@ -84,7 +85,7 @@ function getUtilFunctions(config) {
 
                 
                 `        
-        sendMail(config.mailFrom,username,'Confirm your registration',
+        sendMail(config.mailFrom,username,config.mailRegisterTopic,
             mustache.render(mailTemplate,{link:link,name:name}),
             mustache.render(mailTemplateText,{link:link,name:name})
         );
