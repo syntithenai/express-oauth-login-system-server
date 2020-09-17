@@ -146,26 +146,52 @@ function getLoginSystemRouter(config) {
                 }));
                
                  router.get('/refresh_token', (req,res,next) => {
-                     if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
-                         requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
-                            //// SET NEW REFRESH TOKEN
-                            res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000});
-                            res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
-                            //// RETURN TOKEN ?
-                           res.json(token);
-                        });
-                     } else {
-                         res.json({});
-                     } 
+                     try {
+                         var token={};
+                         if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
+                             requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
+                                //// SET NEW REFRESH TOKEN
+                                res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000});
+                                res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
+                                //// RETURN TOKEN ?
+                               res.json(token);
+                            }).catch(function(e) {
+                                res.json({error:e});
+                            });
+                         } else {
+                             res.json({});
+                         } 
+                    } catch (e) {
+                           res.json({error:e});
+                    }
                  });
                  
                  
                 // END CONFIGURE AND INITIALISE PASSPORT
                 
-                
+                 
                 /*********************************
                  * API ROUTES
                  *********************************/
+                router.use('/buttons',function(req, res, next) {
+                        var buttons=[];
+                        if (config.googleClientId && config.googleClientId.trim() && config.googleClientId && config.googleClientId.trim()) {
+                            buttons.push('google');
+                        } 
+                        if (config.twitterConsumerKey && config.twitterConsumerKey.trim() && config.twitterConsumerSecret && config.twitterConsumerSecret.trim()) {
+                            buttons.push('twitter');
+                        }
+                        if (config.facebookAppId && config.facebookAppId.trim() && config.facebookAppSecret && config.facebookAppSecret.trim()) {
+                            buttons.push('facebook');
+                        }
+                        if (config.githubClientId && config.githubClientId.trim() && config.githubClientSecret && config.githubClientSecret.trim()) {
+                            buttons.push('github');
+                        }
+                        if (config.amazonClientId && config.amazonClientId.trim() && config.amazonClientSecret && config.amazonClientSecret.trim()) {
+                            buttons.push('amazon');
+                        }
+                        res.send({buttons: buttons.join(",")});
+                });
                 
                 router.use('/login',csrfCheck,function(req, res, next) {	  //  console.log('do login NOW')
                     passport.authenticate('local', function(err, user, info) {

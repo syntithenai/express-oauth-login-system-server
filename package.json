@@ -1,6 +1,6 @@
 {
   "name": "express-oauth-login-system-server",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "server routes for express-oauth-login-system",
   "main": "bundle.js",
   "scripts": {
