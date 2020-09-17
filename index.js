@@ -161,10 +161,29 @@ function getLoginSystemRouter(config) {
                  
                 // END CONFIGURE AND INITIALISE PASSPORT
                 
-                
+                 
                 /*********************************
                  * API ROUTES
                  *********************************/
+                router.use('/buttons',function(req, res, next) {
+                        var buttons=[]
+                        if (config.googleClientId && config.googleClientId.trim() && config.googleClientId && config.googleClientId.trim()) {
+                            buttons.push('google')
+                        } 
+                        if (config.twitterConsumerKey && config.twitterConsumerKey.trim() && config.twitterConsumerSecret && config.twitterConsumerSecret.trim()) {
+                            buttons.push('twitter')
+                        }
+                        if (config.facebookAppId && config.facebookAppId.trim() && config.facebookAppSecret && config.facebookAppSecret.trim()) {
+                            buttons.push('facebook')
+                        }
+                        if (config.githubClientId && config.githubClientId.trim() && config.githubClientSecret && config.githubClientSecret.trim()) {
+                            buttons.push('github')
+                        }
+                        if (config.amazonClientId && config.amazonClientId.trim() && config.amazonClientSecret && config.amazonClientSecret.trim()) {
+                            buttons.push('amazon')
+                        }
+                        res.send({buttons: buttons.join(",")})
+                })
                 
                 router.use('/login',csrfCheck,function(req, res, next) {	  //  console.log('do login NOW')
                     passport.authenticate('local', function(err, user, info) {
