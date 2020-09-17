@@ -144,18 +144,24 @@ function getLoginSystemRouter(config) {
                 }))
                
                  router.get('/refresh_token', (req,res,next) => {
-                     var token={}
-                     if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
-                         requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
-                            //// SET NEW REFRESH TOKEN
-                            res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
-                            res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
-                            //// RETURN TOKEN ?
-                           res.json(token)
-                        })
-                     } else {
-                         res.json({})
-                     } 
+                     try {
+                         var token={}
+                         if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
+                             requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
+                                //// SET NEW REFRESH TOKEN
+                                res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
+                                res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
+                                //// RETURN TOKEN ?
+                               res.json(token)
+                            }).catch(function(e) {
+                                res.json({error:e})
+                            })
+                         } else {
+                             res.json({})
+                         } 
+                    } catch (e) {
+                           res.json({error:e})
+                    }
                  })
                  
                  
