@@ -149,7 +149,7 @@ function getLoginSystemRouter(config) {
                          if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
                              requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
                                 //// SET NEW REFRESH TOKEN
-                                res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
+                                res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000, secure: true, sameSite: 'None'})
                                 res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
                                 //// RETURN TOKEN ?
                                res.json(token)
