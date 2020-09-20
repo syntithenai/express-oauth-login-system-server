@@ -8,8 +8,8 @@ function getUserHelpers(config) {
                 requestToken(user).then(function(userAndToken) {
                         let token = userAndToken.token;
                         if (token) {
-                            res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000})
-                            res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000});
+                            res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000, secure: true, sameSite: 'None'})
+                            res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000, secure: true, sameSite: 'None'});
                             cb(null,Object.assign(sanitizeUser(userAndToken),{token:token}))
                         } else {
                             cb('missing token on login success',null)
