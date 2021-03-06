@@ -8,16 +8,6 @@ const User = require('./User');
 
 mongoose.Promise = Promise;
 
-//function connect(connectString='') {
-  //if (connectString.length == 0) {
-      ////connectString = config.databaseConnection + config.database;
-	  //mongoose.connect(connectString,{useMongoClient: true}).then(() => {
-		//console.log('Mongoose Connected');
-	  //}).catch((err) => {
-		//console.log(err);
-	  //});
-  //}
-//}
 
 module.exports = {
   OAuthAccessToken,
@@ -25,5 +15,5 @@ module.exports = {
   OAuthClient,
   OAuthRefreshToken,
   OAuthScope,
-  User
+  User,
 };
