@@ -18,7 +18,21 @@ const database = require('./database');
 
 var cors = require('cors');
 
+
 function getLoginSystemRouter(config) {
+	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : [];
+	var corsOptions = {
+	  origin: function (origin, callback) {
+		console.log([whitelist,origin]);
+		if (whitelist.indexOf(origin) !== -1) {
+		  callback(null, true);
+		} else {
+		  callback(new Error('Not allowed by CORS'));
+		}
+	  }
+	};
+
+
 		mongoose.connect(config.databaseConnection, {useNewUrlParser: true}); 
 
 		mongoose.connection.on('connected', () => {
@@ -277,7 +291,7 @@ function getLoginSystemRouter(config) {
 		/********************
 		 * SIGNUP
 		 ********************/
-		router.post('/signup', cors(),function(req, res) {
+		router.post('/signup', cors(corsOptions),function(req, res) {
 				if (req.body.username && req.body.username.length > 0 && req.body.name && req.body.name.length>0 && req.body.avatar && req.body.avatar.length>0 && req.body.password && req.body.password.length>0 && req.body.password2 && req.body.password2.length>0) {
 				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.toLowerCase().trim()) >= 0 )) {
 					
@@ -310,7 +324,7 @@ function getLoginSystemRouter(config) {
 											item.password2='';
 											let user = new database.User(item);
 											user.save().then(function(result2) {
-												res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username));
+												res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.body.apiUrl ? req.body.apiUrl : config.loginServer, req.body.linkBase));
 											});                                        
 										}
 								});
@@ -327,9 +341,9 @@ function getLoginSystemRouter(config) {
 		  
 
 		/********************
-		 * CONFIRM REGISTRATION
+		 * CONFIRM REGISTRATION 
 		 ********************/
-		router.get('/doconfirm',cors(), function(req,res) {
+		router.get('/doconfirm',cors(corsOptions), function(req,res) {
 			let params = req.query;
 			if (params && params.code && params.code.length > 0) {
 				database.User.findOne({ signup_token:params.code.trim()})
@@ -344,14 +358,17 @@ function getLoginSystemRouter(config) {
 								user.tmp_password = undefined;
 								user.save().then(function() {
 									loginSuccessJson(user,res,function(err,user) {
-										res.redirect(config.loginSuccessRedirect);
+									if (err) console.log(err);
+									res.send({user: user});
+
+										//res.redirect(config.loginSuccessRedirect);
 									});
 								});
 						   } else {
 							   res.send({error:'Token timeout. Refresh the page and try again'});
 						   }
 						} else {
-							res.send({message:'Failed to find your confirm code. You may have already confirmed your registration'} );
+							res.send({error:'Failed to find your confirm code. You may have already confirmed your registration'} );
 						}
 				   // }
 				}).catch(function(e) {
@@ -359,7 +376,7 @@ function getLoginSystemRouter(config) {
 					res.send({error:e});
 				});
 			} else {
-					res.send({error:'Invalid request missing code	'});
+				res.send({error:'Invalid request missing code	'});
 			}
 		});
 
@@ -367,7 +384,7 @@ function getLoginSystemRouter(config) {
 		/********************
 		 * SIGN OUT
 		 ********************/
-		router.post('/logout',cors(), oauthServer.authenticate(), function(req, res) {
+		router.post('/logout',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user && res.locals.oauth.token.user._id)  {
 				database.OAuthRefreshToken.deleteMany({user:ObjectId(res.locals.oauth.token.user._id)}).then(function() {
 				});
@@ -378,42 +395,63 @@ function getLoginSystemRouter(config) {
 		/********************
 		 * SIGN IN
 		 ********************/
-		router.post('/signin',cors(), function(req, res) {
-			console.log(['asignin']);
-			console.log([req.body]);
+		router.post('/signin',cors(corsOptions), function(req, res) {
 			if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
 				var loginPassword = req.body.password.trim();
 				if (config.encryptedPasswords) {
 					loginPassword = md5(req.body.password.trim());
 				} 
-				console.log(['try user']);
 				database.User.findOne({username:req.body.username.trim(),password:loginPassword})
 				.then(function(user)  {
-					console.log(['done user',user]);
 						if (user != null) {
 						   loginSuccessJson(user,res,function(err,finalUser) {
 								if (err) console.log(err);
-								res.redirect(config.loginSuccessRedirect);
+								res.send({user: finalUser});
 							});
 						} else {
-							res.redirect(config.loginFailRedirect+"?fail=true");
+							res.send({error: 'Login Failure'});
 						}
 				}).catch(function(e) {
-					console.log(['catch',e]);
-					res.redirect(config.loginFailRedirect+"?fail=true");
+					res.send({error: 'Login Failure'});
 				});		
 			} else {
-				console.log(['no deets',e]);
-				 res.redirect(config.loginFailRedirect+"?fail=true");
+				res.send({error: 'Login Failure'});
 			}
 		});
 
+		
+		/********************
+		 * SIGN IN
+		 ********************/
+		router.post('/signinajax',cors(corsOptions), function(req, res) {
+			if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
+				var loginPassword = req.body.password.trim();
+				if (config.encryptedPasswords) {
+					loginPassword = md5(req.body.password.trim());
+				} 
+				database.User.findOne({username:req.body.username.trim(),password:loginPassword})
+				.then(function(user)  {
+						if (user != null) {
+						   loginSuccessJson(user,res,function(err,finalUser) {
+								if (err) console.log(err);
+								res.send({user: finalUser});
+							});
+						} else {
+							res.send({error: 'Login Failure'});
+						}
+				}).catch(function(e) {
+					res.send({error: 'Login Failure'});
+				});		
+			} else {
+				res.send({error: 'Login Failure'});
+			}
+		});
 
 
 		/********************
 		 * REQUEST  PASSWORD RECOVERY EMAIL
 		 ********************/
-		router.post('/recover',cors(), function(req, res) {
+		router.post('/recover',cors(corsOptions), function(req, res) {
 			if (req.body.email && req.body.email.length > 0 && req.body.code && req.body.code.length > 0) {
 				if (!req.body.password || req.body.password.length==0 || !req.body.password2 || req.body.password2.length==0) {
 					res.send({error:'Empty password is not allowed'});
@@ -433,7 +471,8 @@ function getLoginSystemRouter(config) {
 						  user.recover_password_token_timestamp =  new Date().getTime();
 						  // no update email address, item.username = req.body.username;
 						  user.save().then(function(xres) {
-							   var link = config.authServer + '/dorecover?code='+user.recover_password_token;
+							  var linkBase = req.body.linkBase;
+							   var link = (req.body.apiUrl ? req.body.apiUrl : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover';
 							   var mailTemplate = config.recoveryEmailTemplate && config.recoveryEmailTemplate.length > 0 ? config.recoveryEmailTemplate : `<div>Hi {{name}}! <br/>
 
 		To confirm your password recovery of your account , please click the link below.<br/>
@@ -472,9 +511,9 @@ function getLoginSystemRouter(config) {
 			}
 		});
 		/********************
-		 * PASSWORD RECOVERY 
+		 * PASSWORD RECOVERY ,cors(corsOptions)
 		 ********************/
-		router.get('/dorecover',cors(),function(req,res) {
+		router.get('/dorecover',function(req,res) {
 				let params = req.query;
 				  database.User.findOne({ recover_password_token:params.code})
 					.then(function(user)  {
@@ -487,18 +526,19 @@ function getLoginSystemRouter(config) {
 							user._id;
 							  user.save().then(function() {
 								 loginSuccessJson(user,res,function(err,finalUser) {
+									//res.redirect(config.loginSuccessRedirect);
 									if (err) console.log(err);
-									res.redirect(config.loginSuccessRedirect);
+									res.send({user: finalUser});
 								});
 							  });
 						   } else {
-								  res.send('Token timeout restart request');
+								  res.send({error: 'Token timeout.  Try to reset your password again.'});
 						   }
 						} else {
-							res.send('Invalid code. You may have already confirmed your password update.');
+							res.send({error: 'Invalid code. You may have already confirmed your password update.'});
 						}
 					}).catch(function(e) {
-						res.send({error:e });
+						//res.send({error:e });
 					});		
 		});
 
@@ -507,7 +547,7 @@ function getLoginSystemRouter(config) {
 		/********************
 		 * Update the access token and return the current user(+token) as JSON
 		 ********************/
-		router.post('/me',cors(), oauthServer.authenticate(), function(req,res) {
+		router.post('/me',cors(corsOptions), oauthServer.authenticate(), function(req,res) {
 			var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {};
 			res.json(loginUser);
 			
@@ -516,7 +556,7 @@ function getLoginSystemRouter(config) {
 		/********************
 		 * SAVE USER, oauthMiddlewares.authenticate
 		 ********************/
-		router.post('/saveuser',cors(), oauthServer.authenticate(), function(req, res) {
+		router.post('/saveuser',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {};
 			if (req.body._id && req.body._id.length > 0 && loginUser._id && loginUser._id === req.body._id) {
 				if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0 && req.body.password2 != req.body.password)  {

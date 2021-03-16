@@ -59,8 +59,8 @@ function getUtilFunctions(config) {
         }
     }
      
-    function sendWelcomeEmail(token,name,username) {
-        var link = config.authServer + '/doconfirm?code='+token;
+    function sendWelcomeEmail(token,name,username, authServer = null, linkBase) {
+        var link = (authServer ? authServer : config.authServer) + '?code='+token + '#'+(linkBase ? linkBase+'/doconfirm' : '/doconfirm');
         
         var mailTemplate = config.signupEmailTemplate && config.signupEmailTemplate.length > 0  ? config.signupEmailTemplate : `<div>Hi {{name}}! <br/>
 

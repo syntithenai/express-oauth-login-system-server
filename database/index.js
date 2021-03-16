@@ -16,4 +16,5 @@ module.exports = {
   OAuthRefreshToken,
   OAuthScope,
   User,
+  ObjectId: mongoose.ObjectId
 };
