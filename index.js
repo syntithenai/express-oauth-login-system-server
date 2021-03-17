@@ -21,7 +21,6 @@ function getLoginSystemRouter(config) {
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : []
 	var corsOptions = {
 	  origin: function (origin, callback) {
-		console.log([whitelist,origin])
 		if (whitelist.indexOf(origin) !== -1) {
 		  callback(null, true)
 		} else {
@@ -35,7 +34,7 @@ function getLoginSystemRouter(config) {
 
 		mongoose.connection.on('connected', () => {
 		  process.nextTick(() => {
-			console.log('Mongoose connected for login system');
+			//console.log('Mongoose connected for login system');
 			
 		  });
 		});
@@ -217,7 +216,7 @@ function getLoginSystemRouter(config) {
 				res.send({buttons: buttons.join(",")})
 		})
 		
-		router.use('/login',csrfCheck,function(req, res, next) {	  //  console.log('do login NOW')
+		router.use('/login',csrfCheck,function(req, res, next) {	 
 			passport.authenticate('local', function(err, user, info) {
 				loginSuccessJson(user,res,function(err,finalUser) {
 					if (err) console.log(err);
