@@ -6,8 +6,6 @@ function getUserHelpers(config) {
 
 // CALLBACK WHEN USER IS IDENTIFIED TO ADD TOKEN AND SET refresh COOKIE
             function loginSuccessJson(user,res,cb) {
-				console.log('USER HELPERS loginSuccessJson')
-				console.log(user)
 				
 				function doRequestToken(user) {
 					requestToken(user).then(function(userAndToken) {
@@ -25,15 +23,10 @@ function getUserHelpers(config) {
 					doRequestToken(user)
 				// user registered but not confirmed , 
 				} else if (user && user._id && new String(user._id).length > 0) {
-					console.log('do search')
 					database.User.findOne(user._id).then(function(user) {
-						console.log('searcj res')
-						console.log(user)
 						if (user) {
 							user.password = user && user.tmp_password && user.tmp_password.length > 0 ? user.tmp_password : (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 							user.save().then(function(res2) {
-								console.log('saved')
-								console.log(res2)
 								doRequestToken(user)
 							})
 						} else {
@@ -50,8 +43,7 @@ function getUserHelpers(config) {
             
             // MAKE A USER/PASS REQUEST FOR A TOKEN AND RESOLVE THE EXTENDED USER 
             function requestToken(user) {
-				console.log('USER HELPER REQUEST TOKEN')
-                 return new Promise(function(resolve,reject) {
+				 return new Promise(function(resolve,reject) {
 					 try {
 						 var params={
 							username: user.username,
