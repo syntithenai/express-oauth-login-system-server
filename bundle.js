@@ -21,12 +21,14 @@ var cors = require('cors');
 
 function getLoginSystemRouter(config) {
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : [];
+	var localOrigin = new URL(config.loginServer).origin;
+	whitelist.push(localOrigin);
 	var corsOptions = {
 	  origin: function (origin, callback) {
 		if (whitelist.indexOf(origin) !== -1) {
 		  callback(null, true);
 		} else {
-		  callback(new Error('Not allowed by CORS'));
+		  callback(new Error('Nots allowed by CORS'));
 		}
 	  }
 	};
@@ -96,6 +98,8 @@ function getLoginSystemRouter(config) {
 		global.Promise = bluebird;
 
 		var router = express.Router();
+		router.options('*', cors());
+
 		router.use(express.urlencoded());
 		router.use(express.json());
 
@@ -118,6 +122,7 @@ function getLoginSystemRouter(config) {
 		  csrf.setToken(req, res, next);
 		});
 
+		
 		// implement csrf check locally so fine grain selection of protected paths can be applied (leaving oauth paths public)
 		// can be enabled/disabled in configuration
 		let csrfCheck = function(req,res,next) { next();};
@@ -510,9 +515,9 @@ function getLoginSystemRouter(config) {
 			}
 		});
 		/********************
-		 * PASSWORD RECOVERY ,cors(corsOptions)
+		 * PASSWORD RECOVERY 
 		 ********************/
-		router.get('/dorecover',function(req,res) {
+		router.get('/dorecover',cors(corsOptions),function(req,res) {
 				let params = req.query;
 				  database.User.findOne({ recover_password_token:params.code})
 					.then(function(user)  {
