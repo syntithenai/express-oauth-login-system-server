@@ -54,7 +54,7 @@ function getLoginSystemRouter(config) {
         var oauthServer = new OAuthServer({
           model: model,
           grants: ['authorization_code', 'refresh_token','password'],
-          accessTokenLifetime: 900, // 15 minutes
+          accessTokenLifetime: config.jwtAccessTokenExpirySeconds, // 15 minutes
           allowEmptyState: true,
           allowExtendedTokenAttributes: true,
         })
