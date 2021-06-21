@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 
 const OAuthAccessTokenSchema = new Schema({
   accessToken: String,
-  accessTokenExpiresAt: Date,
+  accessTokenExpiresAt: Schema.Types.Date,
   scope: String,
   user: { type: Schema.Types.ObjectId, ref: 'User' },
   client: { type: Schema.Types.ObjectId, ref: 'OAuthClient' }

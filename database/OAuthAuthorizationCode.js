@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 
 const OAuthAuthorizationCodeSchema = new Schema({
   code: String,
-  expiresAt: Date,
+  expiresAt: Schema.Types.Date,
   redirectUri: String,
   scope: String,
   user: { type: Schema.Types.ObjectId, ref: 'User' },
