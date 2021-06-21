@@ -17,40 +17,43 @@ const database = require('./database');
 var cors = require('cors')
 
 
-function getLoginSystemRouter(config) {
+async function getLoginSystemRouter(config) {
+	
+	//console.log(config) 
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : []
 	var localOrigin = new URL(config.loginServer).origin
 	whitelist.push(localOrigin)
 	var corsOptions = {
 	  origin: function (origin, callback) {
+		  //console.log([origin,whitelist])
 		if (whitelist.indexOf(origin) !== -1) {
 		  callback(null, true)
 		} else {
-		  callback(new Error('Nots allowed by CORS'))
+		  callback(new Error('Not allowed by CORS'))
 		}
 	  }
 	}
-
-
-		mongoose.connect(config.databaseConnection, {useNewUrlParser: true}) 
-
-		mongoose.connection.on('connected', () => {
-		  process.nextTick(() => {
-			//console.log('Mongoose connected for login system');
-			
-		  });
-		});
-		mongoose.connection.on('error', (e) => {
-		  process.nextTick(() => {
-			console.log(['Mongoose ERR',e]);
-		  });
-		}); 
  
+		//if (!config.skipConnection) {
+			var connection = await mongoose.connect(config.databaseConnection, {useNewUrlParser: true, useUnifiedTopology: false}) 
 
+			//connection.on('connected', () => {
+			  //process.nextTick(() => {
+				//console.log('Mongoose connected for login system');
+				
+			  //});
+			//});
+			//connection.on('error', (e) => {
+			  //process.nextTick(() => {
+				//console.log(['Mongoose ERR',e]);
+			  //});
+			//}); 
+	 
+		//}
+		
+		
 		const model = require('./model_jwt')(database,config)
 	           
-        var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken} = require('./userHelpers')(config)
-        const {sendWelcomeEmail} = require('./utils')(config)
         var oauthServer = new OAuthServer({
           model: model,
           grants: ['authorization_code', 'refresh_token','password'],
@@ -58,6 +61,8 @@ function getLoginSystemRouter(config) {
           allowEmptyState: true,
           allowExtendedTokenAttributes: true,
         })
+        var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken, validatePassword} = require('./userHelpers')(config) //Object.assign({},config,{oauthServer: oauthServer}))
+        const {sendWelcomeEmail} = require('./utils')(config)
             
         var passport = require('./passport')(config,database)
 
@@ -105,14 +110,15 @@ function getLoginSystemRouter(config) {
 		router.use(passport.initialize());
 		
 		router.post('/token', 
-			(req,res,next) => {
-				next()
-			},
 			oauthServer.token({
 			  requireClientAuthentication: { // whether client needs to provide client_secret
 				'authorization_code': false,
-			  }
+				'password': false,
+			  },
+			  accessTokenLifetime: 3600,
+			  refreshTokenLifetime: 1209600,
 			})
+				
 		)
 		
 		// set csrf jeader
@@ -182,6 +188,13 @@ function getLoginSystemRouter(config) {
 						res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000, secure: true, sameSite: 'None'})
 						res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000, secure: true, sameSite: 'None'});
 						//// RETURN TOKEN ?
+					   res.json(token)
+					}).catch(function(e) {
+						res.json({error:e})
+					})
+				  // if cookies fail, try query variable
+				 } else if (req.query['refresh_token'] && req.query['refresh_token'].trim().length > 0) {
+					 requestRefreshToken(req.query['refresh_token']).then(function(token) {
 					   res.json(token)
 					}).catch(function(e) {
 						res.json({error:e})
@@ -294,10 +307,14 @@ function getLoginSystemRouter(config) {
 		 * SIGNUP
 		 ********************/
 		router.post('/signup', cors(corsOptions),function(req, res) {
+			console.log('/signup')
 				if (req.body.username && req.body.username.length > 0 && req.body.name && req.body.name.length>0 && req.body.avatar && req.body.avatar.length>0 && req.body.password && req.body.password.length>0 && req.body.password2 && req.body.password2.length>0) {
-				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.toLowerCase().trim()) >= 0 )) {
+				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.trim()) >= 0 )) {
 					
-					if (req.body.password2 != req.body.password)  {
+					var validateResult = validatePassword(req.body.password)
+					if (!validateResult.valid) {
+						res.send({error:validateResult.message});
+					} else if (req.body.password2 != req.body.password)  {
 						res.send({error:'Passwords do not match.'});
 					} else {
 						database.User.findOne({username:req.body.username.trim()}, function(err, ditem) {
@@ -360,8 +377,8 @@ function getLoginSystemRouter(config) {
 								user.tmp_password = undefined;
 								user.save().then(function() {
 									loginSuccessJson(user,res,function(err,user) {
-									if (err) console.log(err);
-									res.send({user: user})
+										if (err) console.log(err);
+										res.send({user: user})
 
 										//res.redirect(config.loginSuccessRedirect);
 									});
@@ -426,11 +443,14 @@ function getLoginSystemRouter(config) {
 		 * SIGN IN
 		 ********************/
 		router.post('/signinajax',cors(corsOptions), function(req, res) {
+			//console.log(['ahax singin',req.body])
+				
 			if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
 				var loginPassword = req.body.password.trim()
 				if (config.encryptedPasswords) {
 					loginPassword = md5(req.body.password.trim())
 				} 
+				//console.log(['ahax singin',req.body,loginPassword])
 				database.User.findOne({username:req.body.username.trim(),password:loginPassword})
 				.then(function(user)  {
 						if (user != null) {
@@ -454,8 +474,11 @@ function getLoginSystemRouter(config) {
 		 * REQUEST  PASSWORD RECOVERY EMAIL
 		 ********************/
 		router.post('/recover',cors(corsOptions), function(req, res) {
-			if (req.body.email && req.body.email.length > 0 && req.body.code && req.body.code.length > 0) {
-				if (!req.body.password || req.body.password.length==0 || !req.body.password2 || req.body.password2.length==0) {
+			if (req.body.email && req.body.email.length > 0) { // && req.body.code && req.body.code.length > 0) {
+				var validateResult = validatePassword(req.body.password)
+				if (!validateResult.valid) {
+					res.send({error:validateResult.message});
+				} else if (!req.body.password || req.body.password.length==0 || !req.body.password2 || req.body.password2.length==0) {
 					res.send({error:'Empty password is not allowed'});
 				} else if (req.body.password2 != req.body.password)  {
 					res.send({error:'Passwords do not match'});
@@ -498,9 +521,11 @@ function getLoginSystemRouter(config) {
 							   utils.sendMail(config.mailFrom,req.body.email,config.mailForgotPasswordSubject,
 										 mustache.render(mailTemplate,{link:link,name:user.name}),
 										 mustache.render(mailTemplateText,{link:link,name:user.name})
-									  );  
-							  //user.message="Sent recovery email";
-							  res.send({message: "Sent recovery email"});
+								)
+								//.then(function(message) {  
+									
+								//})
+								res.send({message: 'sent message'});
 						  });  
 						  
 					  } else {
@@ -513,13 +538,20 @@ function getLoginSystemRouter(config) {
 			}
 		});
 		/********************
-		 * PASSWORD RECOVERY 
+		 * PASSWORD RECOVERY ,cors(corsOptions)
 		 ********************/
-		router.get('/dorecover',cors(corsOptions),function(req,res) {
+		 router.get('/test',function(req,res) {
+			 res.send('test')
+		 })
+		router.get('/dorecover',function(req,res) {
 				let params = req.query;
+				//console.log('params')
+				//console.log(params)
 				  database.User.findOne({ recover_password_token:params.code})
 					.then(function(user)  {
 						if (user != null) {
+							//console.log(user)
+							//console.log(new Date().getTime(), parseInt(user.recover_password_token_timestamp,10))
 						  if (new Date().getTime() - parseInt(user.recover_password_token_timestamp,10) < 600000) {
 							user.password = user.tmp_password;
 							user.recover_password_token = undefined;
@@ -540,7 +572,7 @@ function getLoginSystemRouter(config) {
 							res.send({error: 'Invalid code. You may have already confirmed your password update.'});
 						}
 					}).catch(function(e) {
-						//res.send({error:e });
+						res.send({error:e });
 					});		
 		})
 
@@ -562,7 +594,11 @@ function getLoginSystemRouter(config) {
 		router.post('/saveuser',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {}
 			if (req.body._id && req.body._id.length > 0 && loginUser._id && loginUser._id === req.body._id) {
-				if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0 && req.body.password2 != req.body.password)  {
+				
+				var validateResult = validatePassword(req.body.password)
+				if (!validateResult.valid) {
+					res.send({error:validateResult.message});
+				} else if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0 && req.body.password2 != req.body.password)  {
 					res.send({error:'Passwords do not match'});
 				} else {
 					database.User.findOne(ObjectId(req.body._id), function(err, user) {
@@ -633,7 +669,7 @@ function getLoginSystemRouter(config) {
 
 		router.use((err, req, res, next) => {
 		  res.status(err.status || 500);
-		  console.log(err);
+		  //console.log(err);
 		  res.json({
 			message: err.message,
 			error: err
