@@ -51,7 +51,10 @@ function getUserHelpers(config) {
 							'grant_type':'password',
 							'client_id':config.clientId,
 							'client_secret':config.clientSecret,
+							
 						  };
+						  //console.log(params)
+						  //console.log(config.authServer)
 						  return fetch( config.authServer+"/token", {
 							  method: 'POST',
 							  headers: {
@@ -60,17 +63,20 @@ function getUserHelpers(config) {
 							  
 							  body: Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
 							}).then(function(response) {
+								//console.log(response)
 								return response.json();
 							}).then(function(token) {
+								//console.log(token)
+								
 								if (token && token.access_token && token.access_token.length > 0) {
 									user.token = token;
 									resolve(user);
 								} else {
-									console.log(['ERROR REQUESTING TOKEN',token])
+									console.log(['ERROR REQUESTING TOKEN empty',token])
 								}
 								resolve();
 							}).catch(function(err) {
-									console.log(['ERROR REQUESTING TOKEN',err])
+									console.log(['ERROR REQUESTING TOKEN err',err])
 									resolve();
 							});
 						} catch (e) {
@@ -110,11 +116,13 @@ function getUserHelpers(config) {
                 });
             }
                         
+     
             
             // SANITIZE USER TO BE DELIVERED TO THE CLIENT, ONLY ALLOWED FIELDS FROM config.userFields and no password fields
+            //,'password','tmp_password' 
             function sanitizeUser(user) {
                 let item={};
-                if (!config.userFields || config.userFields.length === 0) config.userFields=['name','avatar','username','token','password','tmp_password']
+                if (!config.userFields || config.userFields.length === 0) config.userFields=['name','avatar','username']
 
                 config.userFields.map(function(fieldName) {
                     let key = fieldName.trim();
@@ -126,7 +134,43 @@ function getUserHelpers(config) {
                  return item;
             }
         
-            return {sanitizeUser, requestToken, requestRefreshToken, generateToken, loginSuccessJson}
+			function validatePassword(password) {
+				var restrictions = config && config.passwordRestrictions && config.passwordRestrictions >= 0 && config.passwordRestrictions <= 3 ?  config.passwordRestrictions : 0
+				var hasNumber =  /\d/.test( password)
+				var hasPunctuation = /\p{Punct}/.test( password)
+				switch(restrictions) {
+					case 0:
+						return {valid: true}
+					case 1:
+						if (password.trim().length > 5) {
+							return {valid: true}
+						} else {
+							return {valid: false, message: 'Password must be at least six letters'}
+						}
+					case 2:
+						if (!hasNumber) {
+							return {valid: false, message: 'Password must include at least one number'}
+						} else if (password.trim().length >7) {
+							return {valid: true}
+						} else {
+							return {valid: false, message: 'Password must have at least eight letters'}
+						}
+					case 3:
+						if (!hasNumber) {
+							return {valid: false, message: 'Password must include at least one number'}
+						} else if (!hasPunctuation) {
+							return {valid: false, message: 'Password must include at least one number'}
+						} else if (password.trim().length >7) {
+							return {valid: true}
+						} else {
+							return {valid: false, message: 'Password must be at least eight letters'}
+						}
+				}
+				
+			}
+        
+        
+            return {sanitizeUser, requestToken, requestRefreshToken, generateToken, loginSuccessJson, validatePassword}
         }
         
 module.exports = getUserHelpers
