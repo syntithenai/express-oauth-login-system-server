@@ -5,8 +5,8 @@ var JWT = require('jsonwebtoken');
 function getModel(db,config) {
     var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken} = require('./userHelpers')(config)
     var JWT_ISSUER = config.jwtIssuer ? config.jwtIssuer : 'thisdemo';
-    var JWT_SECRET_FOR_ACCESS_TOKEN = config.jwtAccessTokenSecret ? config.jwtAccessTokenSecret : '';
-    var JWT_SECRET_FOR_REFRESH_TOKEN = config.jwtRefreshTokenSecret ? config.jwtRefreshTokenSecret : '';
+    var JWT_SECRET_FOR_ACCESS_TOKEN = config.jwtAccessTokenSecret ? config.jwtAccessTokenSecret : 'thisdemosecret';
+    var JWT_SECRET_FOR_REFRESH_TOKEN = config.jwtRefreshTokenSecret ? config.jwtRefreshTokenSecret : 'thisdemosecretother';
 
     // the expiry times should be consistent between the oauth2-server settings
     // and the JWT settings (not essential, but makes sense)
@@ -33,6 +33,8 @@ function getModel(db,config) {
             client: client,
             user: sanitizeUser(user)
             };
+            if (user.is_admin) payload.user.is_admin = true
+			
             var options = {
                 algorithm: 'HS256'  // HMAC using SHA-256 hash algorithm
             };
