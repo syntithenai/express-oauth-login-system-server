@@ -5,7 +5,6 @@ const http = require('http');
 const loginSystem = require('express-oauth-login-system-server')
 const express = require('express');
 const config = require('./test-config')
-console.log(config)
 const dbHandler = require('./db-handler');
 const User = require('../database/User')
 const OAuthClient = require('../database/OAuthClient')
@@ -17,6 +16,20 @@ var server = null
 const ORIGIN = 'http://localhost:5100'
 const baseUrl = ORIGIN
 
+// TODO
+// cross domain login
+// fails - cors /auth
+// check create OAuthClient
+// cors headers
+// cookies set ?
+// CSRF
+// refresh by query token
+// /login endpoint = uses passport 
+// signup validation
+// forgot validation
+// token timeout on confirm/signup
+// /signinajax
+// err handler 404 501
 
 function getAxiosClient(token,cookies) {
 	var headers = {'Origin': ORIGIN}
@@ -38,18 +51,11 @@ function getAxiosClient(token,cookies) {
 
 const axios = getAxiosClient()
 
-//getAxiosClient()
-const clientId = config.clientId
-const clientSecret = config.clientSecret
-
 /**
  * Connect to a new in-memory database before running any tests.
  */
 beforeAll(async () => {
 	var uri = await dbHandler.connect()
-	
-		
-	
 	const login = await loginSystem(Object.assign({},config, {databaseConnection:uri, authServer:ORIGIN, loginServer:ORIGIN+"/"}))
 	app = express();
 	app.use(login.router)
@@ -60,8 +66,6 @@ beforeAll(async () => {
 	}, app).listen(port, () => {
 	  //console.log(`Login server listening  at http://localhost:`+port)
 	}) 
-	
-		
 });
 
 /**
@@ -91,6 +95,9 @@ afterAll(async () => {
 	server.close()
 });
 
+/**
+ * Test Helpers
+ */
 async function signupAndConfirmUser(name) {
 	// post create new user
 	var cres = await axios.post('/signup',{name: name,username:name,avatar:name,password:'aaa',password2:'aaa'})
@@ -104,6 +111,10 @@ async function signupAndConfirmUser(name) {
 	return rres
 }
 
+
+/**
+ * TESTS
+ */
 
 describe('login system routes', () => {
     it('can get a token through user signup flow then load /me endpoint',async () => {
@@ -169,6 +180,7 @@ describe('login system routes', () => {
 		expect(cres.data.access_token).toBeTruthy()
 		var authClient = getAxiosClient(token)
 		var logoutRes = await authClient.post('/logout')
+		// TODO update refresh cookie from ..
 		cres = await cookieClient.get('/refresh_token')
 		expect(cres.data.access_token).not.toBeTruthy()
 	})

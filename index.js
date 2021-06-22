@@ -540,9 +540,6 @@ async function getLoginSystemRouter(config) {
 		/********************
 		 * PASSWORD RECOVERY ,cors(corsOptions)
 		 ********************/
-		 router.get('/test',function(req,res) {
-			 res.send('test')
-		 })
 		router.get('/dorecover',function(req,res) {
 				let params = req.query;
 				//console.log('params')
