@@ -30,6 +30,7 @@ const baseUrl = ORIGIN
 // token timeout on confirm/signup
 // /signinajax
 // err handler 404 501
+// oauth callback confirm
 
 function getAxiosClient(token,cookies) {
 	var headers = {'Origin': ORIGIN}

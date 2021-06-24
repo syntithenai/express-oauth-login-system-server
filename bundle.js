@@ -673,7 +673,7 @@ async function getLoginSystemRouter(config) {
 			error: err
 		  });
 		});
-		return {router:router, authenticate: oauthServer.authenticate(), csrf:csrf} 
+		return {router:router, authenticate: oauthServer.authenticate(), csrf:csrf, database: database} 
 }
 
 
