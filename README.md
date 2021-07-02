@@ -1,4 +1,4 @@
 # express-oauth-login-system-server
 server routes for login system
 
-![Tests](https://github.com/github/docs/actions/workflows/node.js.yml/badge.svg)
+![Tests](https://github.com/syntithenai/express-oauth-login-system-server/actions/workflows/node.js.yml/badge.svg)
