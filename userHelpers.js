@@ -1,16 +1,21 @@
 var fetch = require('node-fetch');
+var https = require('https');
 var md5 = require('md5')
 const database = require('./database');
 
 function getUserHelpers(config) {
 
+
 // CALLBACK WHEN USER IS IDENTIFIED TO ADD TOKEN AND SET refresh COOKIE
             function loginSuccessJson(user,res,cb) {
 				
 				function doRequestToken(user) {
+					//console.log('DO REQUEST TOKEN')
 					requestToken(user).then(function(userAndToken) {
+						//console.log(['DONE REQUEST TOKEN',userAndToken])
 							let token = userAndToken && userAndToken.token ? userAndToken.token : null;
 							if (token) {
+								//console.log(['DONE REQUEST TOKEN set refresh cookie',token.refresh_token])
 								res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: config.jwtRefreshTokenExpirySeconds, secure: true, sameSite: 'None'})
 								res.cookie('media_token',md5(token.refresh_token),{maxAge: config.jwtRefreshTokenExpirySeconds, secure: true, sameSite: 'None'});
 								cb(null,Object.assign(sanitizeUser(userAndToken),{token:token}))
@@ -46,8 +51,8 @@ function getUserHelpers(config) {
 				 return new Promise(function(resolve,reject) {
 					 try {
 						 var params={
-							username: user.username,
-							password: user.password,
+							username: decodeURIComponent(user.username),
+							password: decodeURIComponent(user.password),
 							'grant_type':'password',
 							'client_id':config.clientId,
 							'client_secret':config.clientSecret,
@@ -60,7 +65,9 @@ function getUserHelpers(config) {
 							  headers: {
 								'Content-Type': 'application/x-www-form-urlencoded',
 							  },
-							  
+							  agent: new https.Agent({  
+								rejectUnauthorized: false
+							  }),
 							  body: Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
 							}).then(function(response) {
 								//console.log(response)
@@ -73,20 +80,23 @@ function getUserHelpers(config) {
 									resolve(user);
 								} else {
 									console.log(['ERROR REQUESTING TOKEN empty',token])
+									resolve();
 								}
-								resolve();
+								
 							}).catch(function(err) {
 									console.log(['ERROR REQUESTING TOKEN err',err])
 									resolve();
 							});
 						} catch (e) {
 							console.log(['USER HELPER REQUEST TOKEN ERR',e.toString()])
+							resolve();
 						}
                 });
             }
 
             // MAKE OAUTH REFRESH REQUEST
             function requestRefreshToken(refreshToken) {
+				//console.log(['rrT',refreshToken])
                  return new Promise(function(resolve,reject) {
                      var params={
                         refresh_token: refreshToken,
@@ -99,7 +109,10 @@ function getUserHelpers(config) {
                           headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
                           },
-                          
+   						  agent: new https.Agent({  
+ 							rejectUnauthorized: false
+						  }),
+
                           body: Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
                         }).then(function(response) {
                             return response.json();
@@ -107,11 +120,12 @@ function getUserHelpers(config) {
                             if (token.access_token && token.access_token.length > 0) {
                                 resolve(token);
                             } else {
-                                console.log(['ERROR REQUESTING TOKEN',token])
+                                //console.log(['ERROR REQUESTING TOKEN',token])
                                 resolve(token);
                             }
                         }).catch(function(err) {
-                                console.log(['ERROR REQUESTING TOKEN',err])
+                                //console.log(['ERROR REQUESTING TOKEN',err])
+                                resolve({})
                         });
                 });
             }

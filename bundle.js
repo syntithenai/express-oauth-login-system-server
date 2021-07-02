@@ -20,14 +20,13 @@ var cors = require('cors');
 
 
 async function getLoginSystemRouter(config) {
-	
 	//console.log(config) 
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : [];
 	var localOrigin = new URL(config.loginServer).origin;
 	whitelist.push(localOrigin);
 	var corsOptions = {
 	  origin: function (origin, callback) {
-		  //console.log([origin,whitelist])
+		  //console.log(['CORS',origin,whitelist])
 		if (whitelist.indexOf(origin) !== -1) {
 		  callback(null, true);
 		} else {
@@ -36,24 +35,7 @@ async function getLoginSystemRouter(config) {
 	  }
 	};
  
-		//if (!config.skipConnection) {
-			await mongoose.connect(config.databaseConnection, {useNewUrlParser: true, useUnifiedTopology: false}); 
-
-			//connection.on('connected', () => {
-			  //process.nextTick(() => {
-				//console.log('Mongoose connected for login system');
-				
-			  //});
-			//});
-			//connection.on('error', (e) => {
-			  //process.nextTick(() => {
-				//console.log(['Mongoose ERR',e]);
-			  //});
-			//}); 
-	 
-		//}
-		
-		
+		await mongoose.connect(config.databaseConnection, {useNewUrlParser: true, useUnifiedTopology: false}); 
 		const model = require('./model_jwt')(database,config);
 	           
         var oauthServer = new OAuthServer({
@@ -184,25 +166,24 @@ async function getLoginSystemRouter(config) {
 		 router.get('/refresh_token', (req,res,next) => {
 			 try {
 				 var token={};
-				 if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0) {
+				 if (req.cookies['refresh_token'] && req.cookies['refresh_token'].trim().length > 0 && req.cookies['refresh_token']!=="undefined") {
 					 requestRefreshToken(req.cookies['refresh_token']).then(function(token) {
 						//// SET NEW REFRESH TOKEN
 						res.cookie('refresh_token',token.refresh_token,{httpOnly: true, maxAge: 604800000, secure: true, sameSite: 'None'});
 						res.cookie('media_token',md5(token.refresh_token),{maxAge: 604800000, secure: true, sameSite: 'None'});
-						//// RETURN TOKEN ?
-					   res.json(token);
+				  	    res.json(token);
 					}).catch(function(e) {
 						res.json({error:e});
 					});
 				  // if cookies fail, try query variable
-				 } else if (req.query['refresh_token'] && req.query['refresh_token'].trim().length > 0) {
-					 requestRefreshToken(req.query['refresh_token']).then(function(token) {
+				 } else if (req.query['refresh_token'] && req.query['refresh_token'].trim().length > 0 && req.query['refresh_token']!=="undefined") {
+					requestRefreshToken(req.query['refresh_token']).then(function(token) {
 					   res.json(token);
 					}).catch(function(e) {
 						res.json({error:e});
 					});
 				 } else {
-					 res.json({});
+					 res.json({error: 'Missing token'});
 				 } 
 			} catch (e) {
 				   res.json({error:e});
@@ -652,7 +633,10 @@ async function getLoginSystemRouter(config) {
 				res.send({error:'No permission to save this user'});
 			}
 		});
-
+		
+		router.get('/test', function(req,res) {
+			res.json({OK: true});
+		});
 		const csrf = require('./csrf');
 		
 		
