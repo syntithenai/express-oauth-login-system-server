@@ -1,7 +1,7 @@
 //const request = require('request');
 const axiosLib = require('axios');
-const http = require('http');
-//const fs = require('fs');
+const https = require('https');
+const fs = require('fs');
 const loginSystem = require('express-oauth-login-system-server')
 const express = require('express');
 const config = require('./test-config')
@@ -13,7 +13,7 @@ var app = null
 
 var server = null
 
-const ORIGIN = 'http://localhost:5100'
+const ORIGIN = 'https://localhost:5100'
 const baseUrl = ORIGIN
 
 // TODO
@@ -46,7 +46,10 @@ function getAxiosClient(token,cookies) {
 		  baseURL: baseUrl,
 		  timeout: 3000,
 		  headers: headers,
-		  withCredentials: true
+		  withCredentials: true,
+		  httpsAgent: new https.Agent({  
+			rejectUnauthorized: false
+		  })
 		});
 	return authClient
 }
@@ -62,11 +65,11 @@ beforeAll(async () => {
 	app = express();
 	app.use(login.router)
 	const port=5100
-	server =  http.createServer({
-		//key: fs.readFileSync(process.env.sslKeyFile),
-		//cert: fs.readFileSync(process.env.sslCertFile),
+	server =  https.createServer({
+		key: fs.readFileSync('./tests/key.pem'),
+		cert: fs.readFileSync('./tests/cert.pem'),
 	}, app).listen(port, () => {
-	  //console.log(`Login server listening  at http://localhost:`+port)
+	  console.log(`Login server listening  at https://localhost:`+port)
 	}) 
 });
 

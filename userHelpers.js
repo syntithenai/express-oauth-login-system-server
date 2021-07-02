@@ -34,9 +34,10 @@ function getUserHelpers(config) {
 							user.save().then(function(res2) {
 								doRequestToken(user)
 							})
-						} else {
-							console.log('no user')
-						}
+						} 
+						//else {
+							//console.log('no user')
+						//}
 					})
 				}
 				

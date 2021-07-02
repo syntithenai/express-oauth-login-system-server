@@ -288,7 +288,7 @@ async function getLoginSystemRouter(config) {
 		 * SIGNUP
 		 ********************/
 		router.post('/signup', cors(corsOptions),function(req, res) {
-			console.log('/signup')
+			//console.log('/signup')
 				if (req.body.username && req.body.username.length > 0 && req.body.name && req.body.name.length>0 && req.body.avatar && req.body.avatar.length>0 && req.body.password && req.body.password.length>0 && req.body.password2 && req.body.password2.length>0) {
 				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.trim()) >= 0 )) {
 					
