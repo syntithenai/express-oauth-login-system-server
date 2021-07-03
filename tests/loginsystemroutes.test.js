@@ -1,4 +1,5 @@
 //const request = require('request');
+global.XMLHttpRequest = undefined
 const axiosLib = require('axios');
 const https = require('https');
 const fs = require('fs');
@@ -17,31 +18,27 @@ const ORIGIN = 'https://localhost:5100'
 const baseUrl = ORIGIN
 
 // TODO
-// 
-// cross domain login
-// fails - cors /auth
-// check create OAuthClient
-// cors headers
-// cookies set ?
-// CSRF
-// refresh by query token
-// /login endpoint = uses passport 
-// signup validation
-// forgot validation
-// token timeout on confirm/signup
-// /signinajax
-// err handler 404 501
-// oauth callback confirm
+// fails - cors/auth  - use bad origin in request
+// cookies set ? - check response for refresh_token, media_token, csrf-token
+// CSRF - enable config csrf, check for cookie in response, send request with bad csrf and expect fail
+// refresh by query token - signup get user and send refresh request with token in url, expect token in response
+// signup validation  - missing name, avatar, username, password(and mismatch)
+// forgot validation - missing username, password(and mismatch)
+// token timeout on confirm/signup - register/forgot then hack timeout in db before attempting doconfirm/doforgot and expecting fail err msg
+// /signinajax - ?? ditch /signin endpoitn ??  
+// oauth routes - authorize/token * ignore self signed ssl
 
-function getAxiosClient(token,cookies) {
-	var headers = {'Origin': ORIGIN}
+//axiosLib.defaults.adapter = require('axios/lib/adapters/http')
+
+function getAxiosClient(token,cookies,origin) {
+	var headers = {'Origin': origin ? origin : ORIGIN}
 	if (token) {
 		headers['Authorization'] =  'Bearer '+token
 	}
 	if (cookies) {
 		headers['Cookie'] =  cookies.join("; ")
 	}
-	 
+	console.log(['AX',headers]) 
 	var authClient = axiosLib.create({
 		  baseURL: baseUrl,
 		  timeout: 3000,
@@ -49,7 +46,8 @@ function getAxiosClient(token,cookies) {
 		  withCredentials: true,
 		  httpsAgent: new https.Agent({  
 			rejectUnauthorized: false
-		  })
+		  }),
+		  adapter: require('axios/lib/adapters/http')
 		});
 	return authClient
 }
@@ -122,6 +120,95 @@ async function signupAndConfirmUser(name) {
  */
 
 describe('login system routes', () => {
+    it('responds with status 404 on invalid endoint',async () => {
+		var meres = null
+		try {
+			meres = await axios.get('/badendpoint')
+		} catch (e) {
+			expect(e.response.status).toEqual(404)
+		}
+	})
+	
+	//it('passes CORS checks for test endpoint with bad origin',async () => {
+		////var meres = null
+		//var badClient = getAxiosClient(null,null,'http://localhost:8000')
+		//var meres = await axios.get('/test')
+		//expect(meres.status).toEqual(200)
+		//expect(meres.data.OK).toEqual(true)
+	//})
+	
+	it('fails CORS checks for signin, doconfirm, recover, dorecover, signinajax, logout, me, saveuser endpoints with bad origin',async () => {
+		var meres = null
+		var rres = await signupAndConfirmUser('john')
+		var token=rres.data.user.token.access_token
+		var badClient = getAxiosClient(token,null,'http://localhost:8000')
+		//signin
+		try {
+			meres = await badClient.post('/signin',{username:'john',password:'aaa'})
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+		//// doconfirm
+		//try {
+			//meres = await badClient.post('/doconfirm',{code:'sdfg4345df'})
+			
+		//} catch (e) {
+			//expect(e.response.status).toEqual(500)
+			//expect(e.response.data.message).toEqual('Not allowed by CORS')
+		//}
+		//forgot
+		try {
+			meres = await badClient.post('/recover',{username:'john',password:'aaa',password2:'aaa'})
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+		// doforgot
+		//try {
+			//meres = await badClient.post('/dorecover',{code:'lkj;oa89sdf0'})
+			
+		//} catch (e) {
+			//expect(e.response.status).toEqual(500)
+			//expect(e.response.data.message).toEqual('Not allowed by CORS')
+		//}
+		// signinajax
+		try {
+			meres = await badClient.post('/signinajax',{username:'john',password:'aaa'})
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+		// logout
+		try {
+			meres = await badClient.post('/logout')
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+		// me
+		try {
+			meres = await badClient.post('/me')
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+		// saveuser
+		try {
+			meres = await badClient.post('/saveuser',{_id:'2234234',username:'john',password:'aaa'})
+			
+		} catch (e) {
+			expect(e.response.status).toEqual(500)
+			expect(e.response.data.message).toEqual('Not allowed by CORS')
+		}
+	})
+    
     it('can get a token through user signup flow then load /me endpoint',async () => {
 		var rres = await signupAndConfirmUser('john')
 		var token=rres.data.user.token.access_token

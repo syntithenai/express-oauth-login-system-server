@@ -519,9 +519,9 @@ async function getLoginSystemRouter(config) {
 			}
 		});
 		/********************
-		 * PASSWORD RECOVERY ,cors(corsOptions)
+		 * PASSWORD RECOVERY 
 		 ********************/
-		router.get('/dorecover',function(req,res) {
+		router.get('/dorecover',cors(corsOptions),function(req,res) {
 				let params = req.query;
 				//console.log('params')
 				//console.log(params)
@@ -633,7 +633,7 @@ async function getLoginSystemRouter(config) {
 			}
 		});
 		
-		router.get('/test', function(req,res) {
+		router.get('/test',cors(), function(req,res) {
 			res.json({OK: true})
 		})
 		const csrf = require('./csrf')
