@@ -3,6 +3,20 @@ var https = require('https');
 var md5 = require('md5')
 const database = require('./database');
 
+function isAlphaNumeric(str) {
+  var code, i, len;
+
+  for (i = 0, len = str.length; i < len; i++) {
+    code = str.charCodeAt(i);
+    if (!(code > 47 && code < 58) && // numeric (0-9)
+        !(code > 64 && code < 91) && // upper alpha (A-Z)
+        !(code > 96 && code < 123)) { // lower alpha (a-z)
+      return false;
+    }
+  }
+  return true;
+}
+
 function getUserHelpers(config) {
 
 
@@ -150,36 +164,52 @@ function getUserHelpers(config) {
             }
         
 			function validatePassword(password) {
-				var restrictions = config && config.passwordRestrictions && config.passwordRestrictions >= 0 && config.passwordRestrictions <= 3 ?  config.passwordRestrictions : 0
-				var hasNumber =  /\d/.test( password)
-				var hasPunctuation = /\p{Punct}/.test( password)
-				switch(restrictions) {
-					case 0:
-						return {valid: true}
-					case 1:
-						if (password.trim().length > 5) {
+				var restrictions = config && config.passwordRestrictions && config.passwordRestrictions >= 0 && config.passwordRestrictions <= 4 ?  config.passwordRestrictions : 0
+				try {
+					var hasNumber =  /\d/.test( password)
+					//console.log(['val',restrictions,hasNumber,password,isAlphaNumeric(password)])
+					var length = password && typeof password.trim === 'function' ? password.trim().length : 0
+					switch(restrictions) {
+						case 0:
 							return {valid: true}
-						} else {
-							return {valid: false, message: 'Password must be at least six letters'}
-						}
-					case 2:
-						if (!hasNumber) {
-							return {valid: false, message: 'Password must include at least one number'}
-						} else if (password.trim().length >7) {
-							return {valid: true}
-						} else {
-							return {valid: false, message: 'Password must have at least eight letters'}
-						}
-					case 3:
-						if (!hasNumber) {
-							return {valid: false, message: 'Password must include at least one number'}
-						} else if (!hasPunctuation) {
-							return {valid: false, message: 'Password must include at least one number'}
-						} else if (password.trim().length >7) {
-							return {valid: true}
-						} else {
-							return {valid: false, message: 'Password must be at least eight letters'}
-						}
+						case 1:
+							if (length > 5) {
+								return {valid: true}
+							} else {
+								return {valid: false, message: 'Password must be at least six letters.'}
+							}
+						case 2:
+							if (!hasNumber) {
+								return {valid: false, message: 'Password must include at least one number.'}
+							} else if (password.trim().length >7) {
+								return {valid: true}
+							} else {
+								return {valid: false, message: 'Password must have at least eight letters.'}
+							}
+						case 3:
+							if (!hasNumber) {
+								return {valid: false, message: 'Password must include at least one number.'}
+							} else if (!hasPunctuation) {
+								return {valid: false, message: 'Password must include at least one number.'}
+							} else if (length >7) {
+								return {valid: true}
+							} else {
+								return {valid: false, message: 'Password must be at least eight letters.'}
+							}
+						case 4:
+							if (length <= 7) {
+								return {valid: false, message: 'Password must be at least eight letters.'}
+							} else if (!hasNumber) {
+								return {valid: false, message: 'Password must include at least one number.'}
+							} else if (isAlphaNumeric(password)) {
+								return {valid: false, message: 'Password must include at least one non alphanumeric symbol.'}
+							} else{
+								return {valid: true}
+							}
+					}
+				} catch (e) {
+					console.log(e)
+					return {valid: false, message:'System error'}
 				}
 				
 			}

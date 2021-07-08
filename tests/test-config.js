@@ -6,9 +6,10 @@ module.exports = {
    sessionSalt:'this is a new session salt value',
    // md5 hash passwords before storing in database
    encryptedPasswords: false ,
-   csrfCheck:  false ,
+   //csrfCheck:  false , 
    // server routes only
    userFields : ['name','avatar','username'],
+   passwordRestrictions: 4,
    allowedUsers:null,
     // jwt
     jwtIssuer: 'thedemo' ,
@@ -61,11 +62,9 @@ module.exports = {
    amazonClientId: 'aaa',
    amazonClientSecret: 'aaa',
 
-
-
-   // EMAIL
+	// EMAIL
     //mailFrom:process.env.mailFrom,
-    //sendGridApiKey: process.env.sendGridApiKey,
+    sendGridApiKey: 'badkey',
     //mailRegisterTopic: process.env.mailRegisterTopic,
     //mailForgotPasswordSubject: process.env.mailForgotPasswordSubject,
     //recoveryEmailTemplate: process.env.recoveryEmailTemplate, 

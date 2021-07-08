@@ -97,38 +97,40 @@ async function getLoginSystemRouter(config) {
 				'authorization_code': false,
 				'password': false,
 			  },
-			  accessTokenLifetime: 3600,
-			  refreshTokenLifetime: 1209600,
+			  //accessTokenLifetime: 3600,
+			  //refreshTokenLifetime: 1209600,
 			})
 				
 		)
 		
-		// set csrf jeader
-		router.use('/',(req, res, next) => {
-		  csrf.setToken(req, res, next)
-		});
+		// TODO csrfCheck needs to be added to routes below
+		// only suitable for single domain setup
+		 //set csrf header
+		//router.use('/',(req, res, next) => {
+		  //if (config.csrfCheck) csrf.setToken(req, res, next)
+		//});
 
 		
-		// implement csrf check locally so fine grain selection of protected paths can be applied (leaving oauth paths public)
-		// can be enabled/disabled in configuration
-		let csrfCheck = function(req,res,next) { next()}
-		if (config.csrfCheck) {
-			csrfCheck = function(req,res,next) {
-				if (req.cookies && req.cookies['csrf-token'] && req.cookies['csrf-token'].length > 0) {
-					if (req.headers && req.headers['x-csrf-token'] && req.headers['x-csrf-token'].length > 0 && req.headers['x-csrf-token'] === req.cookies['csrf-token']) {
-						next();
-					} else if (req.query && req.query['_csrf'] && req.query['_csrf'].length > 0 && req.query['_csrf'] === req.cookies['csrf-token']) {
-						next();
-					} else if (req.body && req.body['_csrf'] && req.body['_csrf'].length > 0 && req.body['_csrf'] === req.cookies['csrf-token']) {
-						next();
-					} else {
-						res.send({error:'Failed CSRF check'});
-					}
-				} else {
-					res.send({error:'Failed CSRF check'});
-				}
-			} 
-		}
+		//// implement csrf check locally so fine grain selection of protected paths can be applied (leaving oauth paths public)
+		//// can be enabled/disabled in configuration
+		//let csrfCheck = function(req,res,next) { next()}
+		//if (config.csrfCheck) {
+			//csrfCheck = function(req,res,next) {
+				//if (req.cookies && req.cookies['csrf-token'] && req.cookies['csrf-token'].length > 0) {
+					//if (req.headers && req.headers['x-csrf-token'] && req.headers['x-csrf-token'].length > 0 && req.headers['x-csrf-token'] === req.cookies['csrf-token']) {
+						//next();
+					//} else if (req.query && req.query['_csrf'] && req.query['_csrf'].length > 0 && req.query['_csrf'] === req.cookies['csrf-token']) {
+						//next();
+					//} else if (req.body && req.body['_csrf'] && req.body['_csrf'].length > 0 && req.body['_csrf'] === req.cookies['csrf-token']) {
+						//next();
+					//} else {
+						//res.send({error:'Failed CSRF check'});
+					//}
+				//} else {
+					//res.send({error:'Failed CSRF check'});
+				//}
+			//} 
+		//}
 		
 		
 		router.post('/authorize', (req,res,next) => {
@@ -150,7 +152,7 @@ async function getLoginSystemRouter(config) {
 		  ]
 			.map(a => `${a}=${req.body[a]}`)
 			.join('&')
-		  return res.redirect(`/oauth?success=false&${params}`)
+		  return res.redirect(config.loginServer + `/oauth?success=false&${params}`)
 		}, (req,res, next) => { // sends us to our redirect with an authorization code in our url
 		  return next()
 		}, oauthServer.authorize({
@@ -215,7 +217,7 @@ async function getLoginSystemRouter(config) {
 				res.send({buttons: buttons.join(",")})
 		})
 		
-		router.use('/login',csrfCheck,function(req, res, next) {	 
+		router.use('/login',function(req, res, next) {	 
 			passport.authenticate('local', function(err, user, info) {
 				loginSuccessJson(user,res,function(err,finalUser) {
 					if (err) console.log(err);
@@ -293,6 +295,7 @@ async function getLoginSystemRouter(config) {
 				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.trim()) >= 0 )) {
 					
 					var validateResult = validatePassword(req.body.password)
+						//console.log(['VAL,PASS',validateResult,config.passwordRestrictions,req.body.password])
 					if (!validateResult.valid) {
 						res.send({error:validateResult.message});
 					} else if (req.body.password2 != req.body.password)  {
@@ -313,21 +316,31 @@ async function getLoginSystemRouter(config) {
 								} else {
 									item.password = req.body.password.trim();
 								}
-								database.User.findOne({avatar:{$eq:req.body.avatar.trim()}}).then(function(avUser) {
-										if (avUser!=null && avUser.length>0) {
-											res.send({error:'Avatar name is already taken, try something different.'});
-										} else {
-											item.signup_token =  generateToken();
-											item.signup_token_timestamp =  new Date().getTime();
-											item.tmp_password=item.password;
-											item.password='';
-											item.password2='';
-											let user = new database.User(item)
-											user.save().then(function(result2) {
-												res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.body.apiUrl ? req.body.apiUrl : config.loginServer, req.body.linkBase));
-											});                                        
-										}
-								});
+								//console.log("CHECK AVATAR "+req.body.avatar)
+								//database.User.find({}).then(function(allU) {
+									//console.log(allU)
+									
+									database.User.findOne({avatar:{$eq:req.body.avatar.trim()}}).then(function(avUser) {
+									//	console.log('AVUSER')
+										//console.log(avUser)
+											if (avUser!=null) {
+												res.send({error:'Avatar name is already taken, try something different.'});
+											} else {
+												item.signup_token =  generateToken();
+												item.signup_token_timestamp =  new Date().getTime();
+												item.tmp_password=item.password;
+												item.password='';
+												item.password2='';
+												let user = new database.User(item)
+												user.save().then(function(result2) {
+													res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.body.apiUrl ? req.body.apiUrl : config.loginServer, req.body.linkBase));
+												});                                        
+											}
+									}).catch(function(e) {
+										console.log(e)
+									});
+								
+								//})
 							}
 						});
 					}
@@ -392,32 +405,32 @@ async function getLoginSystemRouter(config) {
 			res.json({message:'Logged out'})
 		});
 		
-		/********************
-		 * SIGN IN
-		 ********************/
-		router.post('/signin',cors(corsOptions), function(req, res) {
-			if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
-				var loginPassword = req.body.password.trim()
-				if (config.encryptedPasswords) {
-					loginPassword = md5(req.body.password.trim())
-				} 
-				database.User.findOne({username:req.body.username.trim(),password:loginPassword})
-				.then(function(user)  {
-						if (user != null) {
-						   loginSuccessJson(user,res,function(err,finalUser) {
-								if (err) console.log(err);
-								res.send({user: finalUser})
-							})
-						} else {
-							res.send({error: 'Login Failure'})
-						}
-				}).catch(function(e) {
-					res.send({error: 'Login Failure'})
-				});		
-			} else {
-				res.send({error: 'Login Failure'})
-			}
-		});
+		///********************
+		 //* SIGN IN
+		 //********************/
+		//router.post('/signin',cors(corsOptions), function(req, res) {
+			//if (req.body.username && req.body.username.length > 0 && req.body.password && req.body.password.length>0) {
+				//var loginPassword = req.body.password.trim()
+				//if (config.encryptedPasswords) {
+					//loginPassword = md5(req.body.password.trim())
+				//} 
+				//database.User.findOne({username:req.body.username.trim(),password:loginPassword})
+				//.then(function(user)  {
+						//if (user != null) {
+						   //loginSuccessJson(user,res,function(err,finalUser) {
+								//if (err) console.log(err);
+								//res.send({user: finalUser})
+							//})
+						//} else {
+							//res.send({error: 'Login Failure'})
+						//}
+				//}).catch(function(e) {
+					//res.send({error: 'Login Failure'})
+				//});		
+			//} else {
+				//res.send({error: 'Login Failure'})
+			//}
+		//});
 
 		
 		/********************
@@ -460,9 +473,9 @@ async function getLoginSystemRouter(config) {
 				if (!validateResult.valid) {
 					res.send({error:validateResult.message});
 				} else if (!req.body.password || req.body.password.length==0 || !req.body.password2 || req.body.password2.length==0) {
-					res.send({error:'Empty password is not allowed'});
+					res.send({error:'You must provide a new password.'});
 				} else if (req.body.password2 != req.body.password)  {
-					res.send({error:'Passwords do not match'});
+					res.send({error:'Passwords do not match.'});
 				} else {
 					database.User.findOne({username:req.body.email}, function(err, user) {
 					  if (err) {
@@ -478,7 +491,7 @@ async function getLoginSystemRouter(config) {
 						  // no update email address, item.username = req.body.username;
 						  user.save().then(function(xres) {
 							  var linkBase = req.body.linkBase
-							   var link = (req.body.apiUrl ? req.body.apiUrl : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover';
+							   var link = (req.body.apiUrl ? req.body.apiUrl : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover'; 
 							   var mailTemplate = config.recoveryEmailTemplate && config.recoveryEmailTemplate.length > 0 ? config.recoveryEmailTemplate : `<div>Hi {{name}}! <br/>
 
 		To confirm your password recovery of your account , please click the link below.<br/>
@@ -510,7 +523,7 @@ async function getLoginSystemRouter(config) {
 						  });  
 						  
 					  } else {
-						  res.send({error:'No matching email address found for recovery'});
+						  res.send({error:'No matching email address found for recovery.'});
 					  }
 					}); 
 				}
@@ -572,13 +585,22 @@ async function getLoginSystemRouter(config) {
 		router.post('/saveuser',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {}
 			if (req.body._id && req.body._id.length > 0 && loginUser._id && loginUser._id === req.body._id) {
+				// if password is sent, validate it
+				var passwordOK = true
+				if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0) {
+					if (req.body.password2 != req.body.password)  {
+						passwordOK = false
+						res.send({error:'Passwords do not match'});
+					} else {
+						var validateResult = validatePassword(req.body.password)
+						if (!validateResult.valid) {
+							passwordOK = false
+							res.send({error:validateResult.message});
+						} 
+					}
+				}
 				
-				var validateResult = validatePassword(req.body.password)
-				if (!validateResult.valid) {
-					res.send({error:validateResult.message});
-				} else if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0 && req.body.password2 != req.body.password)  {
-					res.send({error:'Passwords do not match'});
-				} else {
+				if (passwordOK) {
 					database.User.findOne(ObjectId(req.body._id), function(err, user) {
 						
 					  if (err) {
