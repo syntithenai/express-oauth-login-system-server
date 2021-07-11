@@ -22,7 +22,7 @@ module.exports = {
    // ensure that your mongo database has a user with read/write access defined in the database that you want to use. DO NOT USE ROOT DB CREDENTIALS
    databaseConnection: '',
    allowedOrigins: 'https://localhost:5000,http://localhost:5100,http://localhost:3000,http://stever-gt62vr-6rd.local:3000',
-   lambdaUrl:"/login",
+   // lambdaUrl:"/login",
    authServer: getGatewayUrl()+'/login/api',
    loginServer: getGatewayUrl()+'/login',
 
@@ -44,12 +44,16 @@ module.exports = {
    
    // local oauth server
    // todo allow for many clients - alexa, google, local... FORNOW create extra records
-   clientId:'test',
-   clientSecret:'testpass',
-   clientName:'test client',
-   clientWebsite:'http://localhost',
-   clientPrivacyPage:'http://localhost',
-   clientImage:'',
+	oauthClients: [{
+		clientId:'test',
+	   clientSecret:'testpass',
+	   clientName:'test client',
+	   clientBy:'test co',
+	   redirectUris: ['https://localhost:5000/dev/login'],
+	   clientWebsite:'http://localhost',
+	   clientPrivacyPage:'http://localhost',
+	   clientImage:'',
+	}],
    
    googleClientId: 'aaa',
    googleClientSecret: 'aaa',

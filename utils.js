@@ -146,10 +146,55 @@ function getUtilFunctions(config) {
         item.message = 'Check your email to confirm your sign up.';
         return item;
     }
+    
+    function createClients(config,database) {
+			//console.log(['CREATE AUTH CLIENTS',config.oauthClients])
+			return new Promise(function(resolve,reject) {
+				var promises = []
+				if (Array.isArray(config.oauthClients)) {
+					config.oauthClients.forEach(function(clientConfig) {
+						//console.log(['CREATE AUTH CLIENT',clientConfig.clientId])
+						database.OAuthClient.findOne({clientId: clientConfig.clientId}).then(function(result) {
+							let clientFields = 	{
+								clientId: clientConfig.clientId, 
+								clientSecret:clientConfig.clientSecret,
+								clientName:clientConfig.clientName,
+								clientBy:clientConfig.clientBy,
+								website_url:clientConfig.clientWebsite,
+								redirectUris:clientConfig.redirectUris,
+								clientImage:clientConfig.clientImage
+							};
+							//console.log(clientFields)
+							if (result!= null) {
+								// OK
+								//console.log('CREATE push update');
+								promises.push(database.OAuthClient.update({clientId:clientConfig.clientId},clientFields))
+							} else {
+								//console.log('CREATE push save');
+								let client = new database.OAuthClient(clientFields);
+								promises.push(client.save())
+							}
+							Promise.all(promises).then(function(res) {
+								//console.log(['CREATED AUTH CLIENTS',res])
+								//database.OAuthClient.find({}).then(function(foundClients) {
+									//console.log(['CREATED AUTH CLIENTS found',foundClients])
+									resolve()
+								//})
+							})
+						}).catch(function(e) {
+							//console.log('CREATE AUTH ERR');
+							console.log(e);
+							resolve()
+						}) 
+					})
+				}
+				
+			})
+		}
 
 
     let utilFunctions =  {
-      sendWelcomeEmail, sendMail, userFromAuthHeaders
+      sendWelcomeEmail, sendMail, userFromAuthHeaders, createClients
     }
     return utilFunctions
 }

@@ -20,13 +20,13 @@ var cors = require('cors');
 
 
 async function getLoginSystemRouter(config) {
-	//console.log(config) 
+	//console.log('GET LOGIN SYSTEM') 
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : [];
 	var localOrigin = new URL(config.loginServer).origin;
 	whitelist.push(localOrigin);
 	var corsOptions = {
 	  origin: function (origin, callback) {
-		  //console.log(['CORS',origin,whitelist])
+		//console.log(['CORS',origin,whitelist])
 		if (whitelist.indexOf(origin) !== -1) {
 		  callback(null, true);
 		} else {
@@ -58,30 +58,54 @@ async function getLoginSystemRouter(config) {
 
         var utils = require("./utils")(config);
         var ObjectId = require('mongodb').ObjectID;
-        // INITIALSE OAUTH SERVER - create client if not exists
-		database.OAuthClient.findOne({clientId: config.clientId}).then(function(client) {
-			let clientFields = 	{
-				clientId: config.clientId, 
-				clientSecret:config.clientSecret,
-				name:config.clientName,
-				website_url:config.clientWebsite,
-				privacy_url:config.
-				clientPrivacyPage,
-				redirectUris:[],
-				image:config.clientImage
-			};
-			if (client!= null) {
-				// OK
-				database.OAuthClient.update({clientId:config.clientId},clientFields);
-			} else {
-				let client = new database.OAuthClient(clientFields);
-				client.save().then(function(r) {
-					
-				});
-			}
-		}).catch(function(e) {
-			console.log(e);
-		});
+        
+        function createClients() {
+			//console.log(['CREATE AUTH CLIENTS',config.oauthClients])
+			return new Promise(function(resolve,reject) {
+				var promises = [];
+				if (Array.isArray(config.oauthClients)) {
+					config.oauthClients.forEach(function(clientConfig) {
+						//console.log(['CREATE AUTH CLIENT',clientConfig.clientId])
+						database.OAuthClient.findOne({clientId: clientConfig.clientId}).then(function(result) {
+							let clientFields = 	{
+								clientId: clientConfig.clientId, 
+								clientSecret:clientConfig.clientSecret,
+								clientName:clientConfig.clientName,
+								clientBy:clientConfig.clientBy,
+								website_url:clientConfig.clientWebsite,
+								redirectUris:clientConfig.redirectUris,
+								clientImage:clientConfig.clientImage
+							};
+							//console.log(clientFields)
+							if (result!= null) {
+								// OK
+								//console.log('CREATE push update');
+								promises.push(database.OAuthClient.update({clientId:clientConfig.clientId},clientFields));
+							} else {
+								//console.log('CREATE push save');
+								let client = new database.OAuthClient(clientFields);
+								promises.push(client.save());
+							}
+							Promise.all(promises).then(function(res) {
+								//console.log(['CREATED AUTH CLIENTS',res])
+								database.OAuthClient.find({}).then(function(foundClients) {
+									//console.log(['CREATED AUTH CLIENTS found',foundClients])
+									resolve();
+								});
+							});
+						}).catch(function(e) {
+							//console.log('CREATE AUTH ERR');
+							console.log(e);
+							resolve();
+						}); 
+					});
+				}
+				
+			})
+		}
+		await createClients();
+		
+		
 		global.Promise = bluebird;
 
 		var router = express.Router();
@@ -134,33 +158,43 @@ async function getLoginSystemRouter(config) {
 			//} 
 		//}
 		
-		
-		router.post('/authorize', (req,res,next) => {
-		  const {username, password} = req.body;
-		  if(username  && password) {
-			  if (config.encryptedPasswords) {
-				   req.body.user = model.getUser(username, md5(password));
-			  } else {  
-				req.body.user = model.getUser(username, password);
-			  }
-			return next()
-		  }
-		  const params = [ // Send params back down
-			'client_id',
-			'redirect_uri',
-			'response_type',
-			'grant_type',
-			'state',
-		  ]
-			.map(a => `${a}=${req.body[a]}`)
-			.join('&');
-		  return res.redirect(config.loginServer + `/oauth?success=false&${params}`)
-		}, (req,res, next) => { // sends us to our redirect with an authorization code in our url
+	//oauthServer.authenticate(), function(req,res) {
+		var loginUser = {};		
+		router.post('/authorize',oauthServer.authenticate(),
+		 (req,res,next) => {
+		  loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {};
+			
+		  //console.log(loginUser)
+		  
+		  //const {username, password} = req.body
+		  //if(username  && password) {
+			  //if (config.encryptedPasswords) {
+				   //req.body.user = model.getUser(username, md5(password))
+			  //} else {  
+				//req.body.user = model.getUser(username, password)
+			  //}
+			//return next()
+		  //}
+		  //const params = [ // Send params back down
+			//'client_id',
+			//'redirect_uri',
+			//'response_type',
+			//'grant_type',
+			//'state',
+		  //]
+			//.map(a => `${a}=${req.body[a]}`)
+			//.join('&')
+			// sends us to our redirect with an authorization code in our url
+		  //return res.redirect(config.loginServer + `/oauth?success=false&${params}`)
+		//}, 
+		//(req,res, next) => { 
+		  ////console.log(req)
 		  return next()
-		}, oauthServer.authorize({
+		}, 
+		oauthServer.authorize({
 		  authenticateHandler: {
 			handle: req => {
-			  return req.body.user
+			  return loginUser
 			}
 		  }
 		}));
@@ -356,9 +390,9 @@ async function getLoginSystemRouter(config) {
 		  
 
 		/********************
-		 * CONFIRM REGISTRATION 
+		 * CONFIRM REGISTRATION cors(corsOptions),
 		 ********************/
-		router.get('/doconfirm',cors(corsOptions), function(req,res) {
+		router.get('/doconfirm', cors(),function(req,res) {
 			let params = req.query;
 			if (params && params.code && params.code.length > 0) {
 				database.User.findOne({ signup_token:params.code.trim()})
@@ -534,9 +568,9 @@ async function getLoginSystemRouter(config) {
 			}
 		});
 		/********************
-		 * PASSWORD RECOVERY 
+		 * PASSWORD RECOVERY cors(corsOptions),
 		 ********************/
-		router.get('/dorecover',cors(corsOptions),function(req,res) {
+		router.get('/dorecover',cors(),function(req,res) {
 				let params = req.query;
 				//console.log('params')
 				//console.log(params)
@@ -579,6 +613,35 @@ async function getLoginSystemRouter(config) {
 			res.json(loginUser);
 			
 		});
+		
+		/********************
+		 * Lookup branding and config for given oauth clientId
+		 ********************/
+		router.get('/oauthclients',cors(), oauthServer.authenticate(), function(req,res) {
+			res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {};
+			if (Array.isArray(config.oauthClients)) {
+				res.json(config.oauthClients);
+			} else {
+				res.json([]);
+			}
+		});
+		
+		router.get('/oauthclientspublic', function(req,res) {
+			if (Array.isArray(config.oauthClients)) {
+				res.json(config.oauthClients.map(function(client) {
+					return {
+						clientId: client.clientId,
+						clientName: client.clientName,
+						clientBy: client.clientBy,
+						clientWebsite: client.clientWebsite,
+						clientImage: client.clientImage
+					}
+				}));
+			} else {
+				res.json([]);
+			}
+		});
+
 
 		/********************
 		 * SAVE USER, oauthMiddlewares.authenticate

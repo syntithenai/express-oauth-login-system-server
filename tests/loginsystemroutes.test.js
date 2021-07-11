@@ -24,9 +24,6 @@ const baseUrl = ORIGIN
 const samplePassword='aaaaaa8?'
 const altSamplePassword='bbbbbb8?'
 // TODO
-// encrypted pw
-// signup validation  - missing name, avatar, username, password(and mismatch)
-// forgot validation - missing username, password(and mismatch)
 // token timeout on confirm/signup - register/forgot then hack timeout in db before attempting doconfirm/doforgot and expecting fail err msg
 
 
@@ -78,13 +75,14 @@ afterEach(async () => await dbHandler.clearDatabase());
 
 beforeEach(async () => {
 	var clients = await OAuthClient.deleteMany({})
+	var clientConfig = config.oauthClients[0]
 	var client = new OAuthClient({
-			clientId: config.clientId, 
-			clientSecret:config.clientSecret,
-			name:config.clientName,
-			website_url:config.clientWebsite,
-			privacy_url:config.clientPrivacyPage,
-			redirectUris:[],
+			clientId: clientConfig.clientId, 
+			clientSecret:clientConfig.clientSecret,
+			name:clientConfig.clientName,
+			website_url:clientConfig.clientWebsite,
+			privacy_url:clientConfig.clientPrivacyPage,
+			redirectUris:Array.isArray(clientConfig.redirectUris) ? clientConfig.redirectUris : '',
 			image:''
 		})
 	await client.save()
@@ -155,7 +153,23 @@ describe('login system routes', () => {
 		}
 	})
 	
+	it('can load all oauth client public details unauthenticated',async () => {
+		var axiosClient = getAxiosClient()
+		var meres = await axiosClient.get('/oauthclientspublic')
+		//console.log(meres.data)
+		expect(meres.data[0].clientId).toBe('test')
+		expect(meres.data[0].clientName).toBe('test client')
+	})
 	
+	
+	it('can load all oauth client details',async () => {
+		var rres = await signupAndConfirmUser('johnson')
+		var token=rres.data.user.token.access_token
+		var axiosClient = getAxiosClient(token)
+		var meres = await axiosClient.get('/oauthclients')
+		//console.log(meres)
+		expect(meres.data[0].clientSecret).toBe('testpass')
+	})
 	
 	it('fails CORS checks for signin, doconfirm, recover, dorecover, signinajax, logout, me, saveuser endpoints with bad origin',async () => {
 		var meres = null
@@ -269,8 +283,6 @@ describe('login system routes', () => {
 		var cres = await axios.post('/signup',{name: name,username:name,avatar:name,password:altSamplePassword,password2:samplePassword})
 		expect(cres.data.error).toBe('Passwords do not match.')
 		
-		
-		//  TODO - config.allowedUsers
 	})
 	
 	it('fails validation on recover when missing data',async () => {

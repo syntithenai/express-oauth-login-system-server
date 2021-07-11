@@ -65,12 +65,13 @@ function getUserHelpers(config) {
             function requestToken(user) {
 				 return new Promise(function(resolve,reject) {
 					 try {
+						 var clientConfig = config.oauthClients[0]
 						 var params={
 							username: decodeURIComponent(user.username),
 							password: decodeURIComponent(user.password),
 							'grant_type':'password',
-							'client_id':config.clientId,
-							'client_secret':config.clientSecret,
+							'client_id':clientConfig.clientId,
+							'client_secret':clientConfig.clientSecret,
 							
 						  };
 						  //console.log(params)
@@ -113,11 +114,12 @@ function getUserHelpers(config) {
             function requestRefreshToken(refreshToken) {
 				//console.log(['rrT',refreshToken])
                  return new Promise(function(resolve,reject) {
-                     var params={
+                     var clientConfig = config.oauthClients[0]
+					 var params={
                         refresh_token: refreshToken,
                         'grant_type':'refresh_token',
-                        'client_id':config.clientId,
-                        'client_secret':config.clientSecret
+                        'client_id':clientConfig.clientId,
+                        'client_secret':clientConfig.clientSecret
                       };
                       return fetch(config.authServer+"/token", {
                           method: 'POST',

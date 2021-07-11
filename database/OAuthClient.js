@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const OAuthClientSchema = new Schema({
-  name: String,
+  clientName: String,
   website_url: String,
-  privacy_url: String,
+  clientBy: String,
   clientId: String,
   clientSecret: String,
   redirectUris: {
