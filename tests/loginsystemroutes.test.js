@@ -80,7 +80,7 @@ beforeEach(async () => {
 	var client = new OAuthClient({
 			clientId: clientConfig.clientId, 
 			clientSecret:clientConfig.clientSecret,
-			name:clientConfig.clientName,
+			clientName:clientConfig.clientName,
 			website_url:clientConfig.clientWebsite,
 			privacy_url:clientConfig.clientPrivacyPage,
 			redirectUris:Array.isArray(clientConfig.redirectUris) ? clientConfig.redirectUris : '',
