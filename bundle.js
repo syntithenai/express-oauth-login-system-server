@@ -368,8 +368,10 @@ async function getLoginSystemRouter(config) {
 												item.password='';
 												item.password2='';
 												let user = new database.User(item);
+												var linkBase = req.body.linkBase;  // optional react router parent path
+  											   
 												user.save().then(function(result2) {
-													res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.body.apiUrl ? req.body.apiUrl : config.loginServer, req.body.linkBase));
+													res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.headers.referer ? req.headers.referer : config.loginServer, linkBase));
 												});                                        
 											}
 									}).catch(function(e) {
@@ -526,8 +528,8 @@ async function getLoginSystemRouter(config) {
 						  user.recover_password_token_timestamp =  new Date().getTime();
 						  // no update email address, item.username = req.body.username;
 						  user.save().then(function(xres) {
-							  var linkBase = req.body.linkBase;
-							   var link = (req.body.apiUrl ? req.body.apiUrl : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover'; 
+							  var linkBase = req.body.linkBase;  // optional react router parent path
+							   var link = (req.headers.referer ? req.headers.referer : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover'; 
 							   var mailTemplate = config.recoveryEmailTemplate && config.recoveryEmailTemplate.length > 0 ? config.recoveryEmailTemplate : `<div>Hi {{name}}! <br/>
 
 		To confirm your password recovery of your account , please click the link below.<br/>

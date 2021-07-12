@@ -1,6 +1,7 @@
 //const request = require('request');
 global.XMLHttpRequest = undefined
 const nodemailer = require('nodemailer');
+const he = require('he');
 const sendgridmailer = require('@sendgrid/mail');
 //console.log([nodemailer, sendgridmailer])
 const axiosLib = require('axios');
@@ -248,8 +249,22 @@ describe('login system routes', () => {
 		sendgridmailer.send.mockReset()
 		var rres = await signupAndConfirmUser('john')
 		var token=rres.data.user.token.access_token
+		
 		// check sendgrid was called
+		//console.log(["A",sendgridmailer.send.mock.calls[0][0],"B"])
+		// to from subject text html
 		expect(sendgridmailer.send.mock.calls.length).toBe(1);
+		expect(sendgridmailer.send.mock.calls[0][0].to).toBe("john");
+		expect(sendgridmailer.send.mock.calls[0][0].from).toBe("testuser@test.com");
+		expect(sendgridmailer.send.mock.calls[0][0].subject).toBe("Your Registration With Test");
+		var textParts = sendgridmailer.send.mock.calls[0][0].text.split("https:")
+		var textLinkParts = textParts[1].split("\n")
+		var textLink = "https:" + he.decode(textLinkParts[0])
+		expect(textLink.startsWith('https://localhost:5100/')).toBe(true)
+		expect(textLink.endsWith('#/doconfirm')).toBe(true)
+		var code = textLink.slice(29,textLink.length - 11)
+		expect(code).toBeTruthy()
+		
 		// test me endpoint
 		var authClient = getAxiosClient(token)
 		var meres = await authClient.post('/me')
@@ -304,18 +319,39 @@ describe('login system routes', () => {
     
     
     it('can change password through forgot password flow',async () => {
+		
 		await signupAndConfirmUser('bill')
 		// start recover with new pw bbb
+		sendgridmailer.send.mockReset()
+		
 		var meres = await axios.post('/recover',{name:'bill',email:'bill',password:altSamplePassword,password2:altSamplePassword})
 		res = await User.findOne({name:'bill',username:'bill'})
 		expect(res.recover_password_token).toBeTruthy()
 		expect(parseInt(res.recover_password_token_timestamp)).toBeGreaterThan(0)
+		
+		
 		
 		// do recover
 		var dores = await axios.get('/dorecover?code=' + res.recover_password_token)
 		var ares = await User.findOne({name:'bill',username:'bill'})
 		expect(ares.recover_password_token).not.toBeTruthy()
 		expect(ares.password).toBe(altSamplePassword)
+		
+		// check sendgrid was called
+		//console.log(["A",sendgridmailer.send.mock.calls[0],"B"])
+		// to from subject text html
+		expect(sendgridmailer.send.mock.calls.length).toBe(1);
+		expect(sendgridmailer.send.mock.calls[0][0].to).toBe("bill");
+		expect(sendgridmailer.send.mock.calls[0][0].from).toBe("testuser@test.com");
+		expect(sendgridmailer.send.mock.calls[0][0].subject).toBe("Password Recovery");
+		var textParts = sendgridmailer.send.mock.calls[0][0].text.split("https:")
+		var textLinkParts = textParts[1].split("\n")
+		var textLink = "https:" + he.decode(textLinkParts[0])
+		expect(textLink.startsWith('https://localhost:5100/')).toBe(true)
+		expect(textLink.endsWith('#/dorecover')).toBe(true)
+		var code = textLink.slice(29,textLink.length - 11)
+		expect(code).toBeTruthy()
+		
 	})
 	
 	

@@ -91,7 +91,7 @@ function getUtilFunctions(config) {
 						  subject: subject,
 						  html: html
 						};
-						console.log(mailOptions);
+						//console.log(mailOptions);
 						transporter.sendMail(mailOptions, function(error, info){
 						  if (error) {
 							console.log(error);

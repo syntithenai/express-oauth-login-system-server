@@ -67,10 +67,10 @@ module.exports = {
    amazonClientSecret: 'aaa',
 
 	// EMAIL
-    //mailFrom:process.env.mailFrom,
+    mailFrom:'testuser@test.com',
     sendGridApiKey: 'badkey',
-    //mailRegisterTopic: process.env.mailRegisterTopic,
-    //mailForgotPasswordSubject: process.env.mailForgotPasswordSubject,
+    mailRegisterTopic: 'Your Registration With Test',
+    mailForgotPasswordSubject: 'Password Recovery',
     //recoveryEmailTemplate: process.env.recoveryEmailTemplate, 
     //signupEmailTemplate: process.env.signupEmailTemplate
 }
