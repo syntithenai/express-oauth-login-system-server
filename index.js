@@ -18,7 +18,7 @@ var cors = require('cors')
 
 
 async function getLoginSystemRouter(config) {
-	//console.log('GET LOGIN SYSTEM') 
+	console.log('GET LOGIN SYSTEM') 
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : []
 	var localOrigin = new URL(config.loginServer).origin
 	whitelist.push(localOrigin)
@@ -97,6 +97,8 @@ async function getLoginSystemRouter(config) {
 							resolve()
 						}) 
 					})
+				} else {
+					resolve()
 				}
 				
 			})
