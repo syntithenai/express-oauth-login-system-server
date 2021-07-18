@@ -20,6 +20,7 @@ function getModel(db,config) {
     const OAuthRefreshToken = db.OAuthRefreshToken;
     
     function generateAccessToken(client, user, scope,callback) {
+		//console.log(['generateAccessToken',client, user, scope])
         return new Promise(function(resolve,reject) {
             var token;
             var secret;
@@ -51,6 +52,7 @@ function getModel(db,config) {
 
 
     function getAccessToken(bearerToken, callback) {
+		//console.log(['get access token',bearerToken])
         return JWT.verify(bearerToken, JWT_SECRET_FOR_ACCESS_TOKEN, function(err, decoded) {
             if (err) {
               return callback(err, false);   // the err contains JWT error data
@@ -74,6 +76,7 @@ function getModel(db,config) {
 
 
     function getClient(clientId, clientSecret) {
+		//console.log(['get client',clientId, clientSecret])
       return new Promise(function(resolve,reject) {
           const query = { clientId };
           if (clientSecret) {
@@ -96,6 +99,7 @@ function getModel(db,config) {
     }
 
     function getClientById(id) {
+		//console.log(['get client by id',id])
       return new Promise(function(resolve,reject) {
           const query = { _id:ObjectId(id)};
           
@@ -115,6 +119,7 @@ function getModel(db,config) {
     }
 
     function getUser(username, password) {
+		//console.log(['get user',username,password])
       return User
         .findOne({ username, password })
         .lean()
@@ -127,6 +132,7 @@ function getModel(db,config) {
     }
 
     function getUserById(id) {
+		//console.log(['get user by id',id])
       return User
         .findOne({ _id: ObjectId(id) })
         .lean()
@@ -154,6 +160,7 @@ function getModel(db,config) {
 
 
     function saveToken(token, client, user) {
+		//console.log(['save token',token,client,user])
       return Promise.all([
         
         token.refreshToken ? OAuthRefreshToken.create({ // no refresh token for client_credentials

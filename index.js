@@ -629,7 +629,8 @@ async function getLoginSystemRouter(config) {
 			}
 		})
 		
-		router.get('/oauthclientspublic', function(req,res) {
+		router.get('/oauthclientspublic', cors(), function(req,res) {
+			console.log(['/oauthclientspublic',config.oauthClients])
 			if (Array.isArray(config.oauthClients)) {
 				res.json(config.oauthClients.map(function(client) {
 					return {
@@ -739,7 +740,7 @@ async function getLoginSystemRouter(config) {
 
 		router.use((err, req, res, next) => {
 		  res.status(err.status || 500);
-		  //console.log(err);
+		  console.log(err);
 		  res.json({
 			message: err.message,
 			error: err

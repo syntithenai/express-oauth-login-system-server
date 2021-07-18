@@ -126,6 +126,7 @@ ExpressOAuthServer.prototype.token = function(options) {
         return handleResponse.call(this, req, res, response);
       })
       .catch(function(e) {
+		  console.log(e)
         return handleError.call(this, e, req, res, response, next);
       });
   };

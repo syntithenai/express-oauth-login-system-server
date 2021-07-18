@@ -1,4 +1,5 @@
-var fetch = require('node-fetch');
+//var fetch = require('node-fetch');
+var axios = require('axios')
 var https = require('https');
 var md5 = require('md5')
 const database = require('./database');
@@ -16,6 +17,23 @@ function isAlphaNumeric(str) {
   }
   return true;
 }
+
+function getAxiosClient(cookies) {
+	var headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+	if (Array.isArray(cookies)) {
+		headers['Cookie'] =  cookies.join("; ")
+	}
+	
+	var authClient = axios.create({
+		  httpsAgent: new https.Agent({  
+			rejectUnauthorized: false
+		  }),
+		  timeout: 3000,
+		  headers: headers,
+		});
+	return authClient
+}
+
 
 function getUserHelpers(config) {
 
@@ -63,10 +81,11 @@ function getUserHelpers(config) {
             
             // MAKE A USER/PASS REQUEST FOR A TOKEN AND RESOLVE THE EXTENDED USER 
             function requestToken(user) {
+				//console.log(['REQUESTING TOKEN '])
 				 return new Promise(function(resolve,reject) {
 					 try {
 						 var clientConfig = config.oauthClients[0]
-						 var params={
+						 var tokenParams={
 							username: decodeURIComponent(user.username),
 							password: decodeURIComponent(user.password),
 							'grant_type':'password',
@@ -74,30 +93,26 @@ function getUserHelpers(config) {
 							'client_secret':clientConfig.clientSecret,
 							
 						  };
+						
+						const params = new URLSearchParams();
+						Object.keys(tokenParams).forEach(function(key) {
+							params.append(key, tokenParams[key]);
+						})	
+						var client = getAxiosClient()
 						  //console.log(params)
 						  //console.log(config.authServer)
-						  return fetch( config.authServer+"/token", {
-							  method: 'POST',
-							  headers: {
-								'Content-Type': 'application/x-www-form-urlencoded',
-							  },
-							  agent: new https.Agent({  
-								rejectUnauthorized: false
-							  }),
-							  body: Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
-							}).then(function(response) {
-								//console.log(response)
-								return response.json();
-							}).then(function(token) {
-								//console.log(token)
-								
+						  return client.post( config.authServer+"/token",params).then(function(loaded) {
+							  var token = loaded.data
+							  //console.log(token.access_token)
+								//return response.json();
+							//}).then(function(token) {
 								if (token && token.access_token && token.access_token.length > 0) {
 									user.token = token;
 									resolve(user);
 								} else {
-									console.log(['ERROR REQUESTING TOKEN empty',token])
+									console.log(['ERROR REQUESTING TOKEN empty'])
 									resolve();
-								}
+								} 
 								
 							}).catch(function(err) {
 									console.log(['ERROR REQUESTING TOKEN err',err])
@@ -115,25 +130,27 @@ function getUserHelpers(config) {
 				//console.log(['rrT',refreshToken])
                  return new Promise(function(resolve,reject) {
                      var clientConfig = config.oauthClients[0]
-					 var params={
+                     //console.log(['rrT client',clientConfig])
+					 var tokenParams={
                         refresh_token: refreshToken,
                         'grant_type':'refresh_token',
                         'client_id':clientConfig.clientId,
                         'client_secret':clientConfig.clientSecret
                       };
-                      return fetch(config.authServer+"/token", {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                          },
-   						  agent: new https.Agent({  
- 							rejectUnauthorized: false
-						  }),
-
-                          body: Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&')
-                        }).then(function(response) {
-                            return response.json();
-                        }).then(function(token) {
+                    	//console.log('tokenParams')
+						//console.log(tokenParams)
+					
+					  const params = new URLSearchParams();
+						Object.keys(tokenParams).forEach(function(key) {
+							params.append(key, tokenParams[key]);
+						})	
+						var client = getAxiosClient() //['refresh_token='+refreshToken])
+                        client.post(config.authServer+"/token", params).then(function(data) {
+                            //return response.json();
+                        //}).then(function(token) {
+							//console.log(data)
+							var token = data.data
+                            //console.log(['gotTTTT',token])
                             if (token.access_token && token.access_token.length > 0) {
                                 resolve(token);
                             } else {
