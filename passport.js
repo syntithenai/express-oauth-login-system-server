@@ -2,7 +2,7 @@ var md5 = require('md5');
 const crypto = require("crypto"); 
 var faker = require('faker');
 
-function generatePassport(config,database) {
+function generatePassport(config,model) {
 // CONFIGURE AND INITIALISE PASSPORT 
 	var passport = require('passport')
 
@@ -15,52 +15,23 @@ function generatePassport(config,database) {
 	});
 	
 
-	// CALLBACK TO SUPPORT PASSPORT STRATEGIES
-	function findOrCreateUser(name,email,cb) {
-		if (email && email.length > 0) {
-			if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(email.toLowerCase().trim()) >= 0 )) {
-				 database.User.findOne({username:email.trim()}).then(function(user) {
-					  if (user!=null) {
-						  	// USER LOGIN SUCCESS JSON
-							cb(null,user.toObject());
-					  } else {
-						  var pw = crypto.randomBytes(20).toString('hex');
-						  let item={name:name,username:email,password:pw};
-                          if (config.encryptedPasswords) {
-                              item.password = md5(pw)
-                          }
-						   if (!item.avatar) item.avatar = faker.commerce.productAdjective()+faker.name.firstName()+faker.name.lastName()
-						  
-						  let user = new database.User(item);
-						  user.save().then(function() {;
-								// USER LOGIN SUCCESS JSON
-								cb(null,user.toObject());
-						  });
-					  }
-				 }).catch(function(e) {
-					 cb(e, null);
-				 });
-			} else {
-				cb('Not allowed to register', null);
-			}		 
-		} else {
-			cb('no user', null);
-		}
-	}
-
 
 	var LocalStrategy = require('passport-local').Strategy;
 
 	// username/password
 	passport.use(new LocalStrategy(
 	  function(username, password, done) {
-		database.User.findOne({ username: username,password:password }, function (err, user) {
-		  if (err) { return done(err); }
-		  if (!user) {
-			return done(null, false, { message: 'Incorrect login details' });
-		  }
-		  return done(null, user);
-		});
+      if (!username || !password) {
+        return done(null, false, { message: 'Missing credentials' });
+      }
+      model.findUserByUsername(username, password).then(function(user) {
+          //database.User.findOne({ username: username,password:password }, function (err, user) {
+        // if (err) { return done(err); }
+        if (!user) {
+          return done(null, false, { message: 'Incorrect login details' });
+        }
+        return done(null, user);
+      });
 	  }
 	));
 
@@ -75,7 +46,7 @@ function generatePassport(config,database) {
           function(accessToken, refreshToken, profile, cb) {
             if (profile && profile.emails && profile.emails.length > 0) {
                     let email = profile.emails[0].value
-                    findOrCreateUser(profile.displayName,email,cb);
+                    model.findOrCreateUser(profile.displayName,email,cb);
                 } else {
                     cb('google did not provide an email',null);
                 }
@@ -95,7 +66,7 @@ function generatePassport(config,database) {
           function(token, tokenSecret, profile, cb) {
                 if (profile && profile.emails && profile.emails.length > 0) {
                     let email = profile.emails[0].value
-                    findOrCreateUser(profile.displayName,email,cb);
+                    model.findOrCreateUser(profile.displayName,email,cb);
                 } else {
                     cb('twitter did not provide an email',null);
                 }
@@ -114,7 +85,7 @@ function generatePassport(config,database) {
           function(token, tokenSecret, profile, cb) {
                 if (profile && profile.emails && profile.emails.length > 0) {
                     let email = profile.emails[0].value
-                    findOrCreateUser(profile.displayName,email,cb);
+                    model.findOrCreateUser(profile.displayName,email,cb);
                 } else {
                     cb('FacebookStrategy did not provide an email',null);
                 }
@@ -133,7 +104,7 @@ function generatePassport(config,database) {
           function(accessToken, refreshToken, profile, cb) {
             if (profile && profile.emails && profile.emails.length > 0) {
                 let email = profile.emails[0].value
-                findOrCreateUser(profile.displayName ? profile.displayName : profile.username,email,cb);
+                model.findOrCreateUser(profile.displayName ? profile.displayName : profile.username,email,cb);
             } else {
                 cb('github did not provide an email',null);
             }
@@ -151,7 +122,7 @@ function generatePassport(config,database) {
           function(accessToken, refreshToken, profile, cb) {
             if (profile && profile.emails && profile.emails.length > 0) {
                 let email = profile.emails[0].value
-                findOrCreateUser(profile.displayName ? profile.displayName : profile.username,email,cb);
+                model.findOrCreateUser(profile.displayName ? profile.displayName : profile.username,email,cb);
             } else {
                 cb('amazon did not provide an email',null);
             }

@@ -2,7 +2,7 @@
 var axios = require('axios')
 var https = require('https');
 var md5 = require('md5')
-const database = require('./database');
+// const database = require('./mongodb_database');
 
 function isAlphaNumeric(str) {
   var code, i, len;
@@ -35,7 +35,7 @@ function getAxiosClient(cookies) {
 }
 
 
-function getUserHelpers(config) {
+function getUserHelpers(config ,model) {
 
 
 // CALLBACK WHEN USER IS IDENTIFIED TO ADD TOKEN AND SET refresh COOKIE
@@ -59,11 +59,12 @@ function getUserHelpers(config) {
 				if (user && user.password && user.password.length > 0) {
 					doRequestToken(user)
 				// user registered but not confirmed , 
-				} else if (user && user._id && new String(user._id).length > 0) {
-					database.User.findOne(user._id).then(function(user) {
+				} else if (user && user.username && new String(user.username).length > 0) {
+					//database.User.findOne(user._id)
+					model.findUserByUsername(user.username).then(function(user) {
 						if (user) {
 							user.password = user && user.tmp_password && user.tmp_password.length > 0 ? user.tmp_password : (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
-							user.save().then(function(res2) {
+							model.saveUser(user).then(function(res2) {
 								doRequestToken(user)
 							})
 						} 

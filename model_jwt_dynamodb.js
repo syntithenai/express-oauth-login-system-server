@@ -284,6 +284,149 @@ function getModel(db,config) {
       return true;
     }
 
+
+    function findOrCreateUser(name,email,cb) {
+      if (email && email.length > 0) {
+        // if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(email.toLowerCase().trim()) >= 0 )) {
+          db.User.findOne({username:email.trim()}).then(function(user) {
+              if (user!=null) {
+                  // USER LOGIN SUCCESS JSON
+                cb(null,user.toObject());
+              } else {
+                var pw = crypto.randomBytes(20).toString('hex');
+                let item={name:name,username:email,password:pw};
+                            if (config.encryptedPasswords) {
+                                item.password = md5(pw)
+                            }
+                 if (!item.avatar) item.avatar = faker.commerce.productAdjective()+faker.name.firstName()+faker.name.lastName()
+                
+                let user = new database.User(item);
+                user.save().then(function() {;
+                  // USER LOGIN SUCCESS JSON
+                  cb(null,user.toObject());
+                });
+              }
+           }).catch(function(e) {
+             cb(e, null);
+           });
+        // } else {
+        //   cb('Not allowed to register', null);
+        // }		 
+      } else {
+        cb('no user', null);
+      }
+    }
+  
+    function findUserByUsername(username, password=null) {
+      return new Promise(function(resolve,reject) {
+        db.User.findOne({ username: username }, function (err, user) {
+          // if (err) { resolve(err); }
+          // console.log('findUserByUsername', username, err, user);
+          if (!user) {
+            resolve(null) // { message: 'Incorrect login details' },null);
+          }
+          // console.log('findUserByUsername check pw', password, user);
+          // check password if supplied
+          if (password && password.length > 0) {
+            if (user.password !== password) { 
+              resolve(null) //{ message: 'Incorrect login details' }),null;
+            }
+          }
+          resolve(user);
+        })
+      })
+    }
+
+    function findUserByAvatar(avatar) {
+      return new Promise(function(resolve,reject) {
+        db.User.findOne({ avatar: avatar }, function (err, user) {
+          resolve(user);
+        })
+      })
+    }
+
+    function findUserBySignupToken(token) {
+      return new Promise(function(resolve,reject) {
+        db.User.findOne({ signup_token: token }, function (err, user) {
+          resolve(user);
+        })
+      })
+    } 
+
+    function findUserByRecoveryToken(token) {
+      return new Promise(function(resolve,reject) {
+        db.User.findOne({ recover_password_token: token }, function (err, user) {
+          resolve(user);
+        })
+      })
+    }
+
+    function saveUser(saveuser) {
+      return new Promise(function(resolve,reject) {
+        if (saveuser && saveuser.username) {
+          db.User.updateOne({username:saveuser.username},saveuser,{upsert:true},function(err,user) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(user);
+            }
+          });
+        } else {
+          reject()
+        }
+      })
+    }
+
+    function createClients(clients) {
+      return new Promise(function(resolve,reject) {
+        var promises = []
+        if (Array.isArray(clients)) {
+          clients.forEach(function(clientConfig) {
+            //console.log(['CREATE AUTH CLIENT',clientConfig.clientId])
+            db.OAuthClient.findOne({clientId: clientConfig.clientId}).then(function(result) {
+              let clientFields = 	{
+                clientId: clientConfig.clientId, 
+                clientSecret:clientConfig.clientSecret,
+                clientName:clientConfig.clientName,
+                clientBy:clientConfig.clientBy,
+                website_url:clientConfig.clientWebsite,
+                redirectUris:clientConfig.redirectUris,
+                clientImage:clientConfig.clientImage
+              };
+              //console.log(clientFields)
+              if (result!= null) {
+                // OK
+                //console.log('CREATE push update');
+                promises.push(db.OAuthClient.update({clientId:clientConfig.clientId},clientFields))
+              } else {
+                //console.log('CREATE push save');
+                let client = new db.OAuthClient(clientFields);
+                promises.push(client.save())
+              }
+              Promise.all(promises).then(function(res) {
+                //console.log(['CREATED AUTH CLIENTS',res])
+                db.OAuthClient.find({}).then(function(foundClients) {
+                  //console.log(['CREATED AUTH CLIENTS found',foundClients])
+                  resolve()
+                })
+              })
+            }).catch(function(e) {
+              //console.log('CREATE AUTH ERR');
+              console.log(e);
+              resolve()
+            }) 
+          })
+        } else {
+          resolve()
+        }
+        
+      })
+    }
+
+    function deleteRefreshTokensForUser(userId) {
+      return db.OAuthRefreshToken.deleteMany({user:ObjectId(userId)})
+    }
+
     return {
        generateAccessToken, 
        getAccessToken,
@@ -298,7 +441,15 @@ function getModel(db,config) {
       saveAuthorizationCode,
       validateScope,
       verifyScope,
-      getUserFromAccessToken
+      getUserFromAccessToken,
+      findOrCreateUser,
+      findUserByUsername,
+      findUserBySignupToken,
+      findUserByRecoveryToken,
+      findUserByAvatar,
+      saveUser,
+      deleteRefreshTokensForUser,
+      createClients
     };
 }
 

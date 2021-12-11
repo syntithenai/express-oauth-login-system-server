@@ -13,8 +13,8 @@ const loginSystem = require('express-oauth-login-system-server')
 const express = require('express');
 const config = require('./test-config')
 const dbHandler = require('./db-handler');
-const User = require('../database/User')
-const OAuthClient = require('../database/OAuthClient')
+const User = require('../mongodb_database/User')
+const OAuthClient = require('../mongodb_database/OAuthClient')
 
 var app = null
 
@@ -122,14 +122,14 @@ async function signupAndConfirmUser(name,username=null, avatar=null) {
 		//console.log(cres)
 		expect(cres.data.message).toBe('Check your email to confirm your sign up.')
 		// check cookies
-		var cookies = cres.headers.['set-cookie']
+		var cookies = cres.headers['set-cookie']
 		// check user in db
 		var res = await User.findOne({username:username ? username : name})
 		expect(res.signup_token).toBeTruthy()
 		expect(parseInt(res.signup_token_timestamp)).toBeGreaterThan(0)
 		// do confirmation
 		var rres = await axios.get('/doconfirm?code='+res.signup_token)
-		var cookies2 = rres.headers.['set-cookie']
+		var cookies2 = rres.headers['set-cookie']
 		expect(hasCookie('refresh_token',cookies2)).toBe(true)
 		expect(hasCookie('media_token',cookies2)).toBe(true)
 		
@@ -166,6 +166,7 @@ describe('login system routes', () => {
 	it('can load all oauth client details',async () => {
 		var rres = await signupAndConfirmUser('johnson')
 		var token=rres.data.user.token.access_token
+		//console.log(['SIGNED UP',token,rres.data])
 		var axiosClient = getAxiosClient(token)
 		var meres = await axiosClient.get('/oauthclients')
 		//console.log(meres)
@@ -275,7 +276,8 @@ describe('login system routes', () => {
 		var rres = await signupAndConfirmUser('john','jbell','belly')
 		// conflict with existing user
 		var cres = await axios.post('/signup',{name: 'john',username:'jbell',avatar:'bello',password:samplePassword,password2:samplePassword})
-		expect(cres.data.error.indexOf('There is already a user registered with the email address ')).toBe(0)
+		// console.log(cres.data)
+		expect(cres.data.error.indexOf('There is already a user registered as ')).toBe(0)
 		// conflict with existing  avatar
 		var cres = await axios.post('/signup',{name: 'john',username:'jbell332',avatar:'belly',password:samplePassword,password2:samplePassword})
 		//console.log(cres)
@@ -333,7 +335,9 @@ describe('login system routes', () => {
 		
 		// do recover
 		var dores = await axios.get('/dorecover?code=' + res.recover_password_token)
+		// console.log('dores',dores.data)
 		var ares = await User.findOne({name:'bill',username:'bill'})
+		// console.log(ares)
 		expect(ares.recover_password_token).not.toBeTruthy()
 		expect(ares.password).toBe(altSamplePassword)
 		
@@ -360,12 +364,14 @@ describe('login system routes', () => {
 		var token=rres.data.user.token.access_token
 		//// save changes
 		var authClient = getAxiosClient(token)
-		try {
-			var cres = await authClient.post('/saveuser',{_id:rres.data.user._id, name: 'jill',username:'jill',avatar:'jill'})
+		// try {
+			// console.log('save user changes')	
+		var cres = await authClient.post('/saveuser',{username:'bill', name: 'bilbo',avatar:'bilbo'})
+			// console.log(cres.data)
 			expect(cres.data.message).toBe('Saved changes')
-		} catch (e) {
-			console.log(e)
-		}
+		// } catch (e) {
+		// 	console.log(e)
+		// }
 	})
     
     it('can use refresh token in uri',async () => {
@@ -408,5 +414,28 @@ describe('login system routes', () => {
 		// TODO update refresh cookie from ..
 		cres = await cookieClient.get('/refresh_token')
 		expect(cres.data.access_token).not.toBeTruthy()
+	})
+
+	it('can login with username and password',async () => {
+		var rres = await signupAndConfirmUser('jane')
+		var token=rres.data.user.token.access_token
+		var cookies = rres.headers["set-cookie"]
+		//axios.defaults.headers.Cookie = cookie;
+		var cookieClient = getAxiosClient(null,cookies)
+		var cres = await cookieClient.get('/refresh_token')
+		expect(cres.data.access_token).toBeTruthy()
+		var authClient = getAxiosClient(token)
+		var logoutRes = await authClient.post('/logout')
+		// TODO update refresh cookie from ..
+		cres = await cookieClient.get('/refresh_token')
+		expect(cres.data.access_token).not.toBeTruthy()
+		// Finally login
+		var axiosClient = getAxiosClient()
+		try {
+			meres = await axiosClient.post('/signinajax',{username:'jane',password:samplePassword})
+			// console.log(meres.data)
+		} catch (e) {
+			console.log(e)
+		}
 	})
 });

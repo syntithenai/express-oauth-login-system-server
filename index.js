@@ -1,5 +1,5 @@
 var express = require('express');
-const {ObjectId} = require('mongodb');
+// const {ObjectId} = require('mongodb');
 var fetch = require('node-fetch');
 const mustache = require('mustache');
 const crypto = require("crypto"); 
@@ -12,13 +12,18 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const bluebird = require('bluebird');
 const OAuthServer = require('./express-oauth-server')
-const database = require('./database');
 
 var cors = require('cors')
 
 
 async function getLoginSystemRouter(config) {
-	console.log('GET LOGIN SYSTEM') 
+	//console.log('GET LOGIN SYSTEM') 
+	// dynamodb or mongodb - default mongodb
+	var databaseType = config.databaseType   
+	if (databaseType !== 'dynamodb') {
+		databaseType = 'mongodb'
+	}
+	
 	var whitelist = config.allowedOrigins ? config.allowedOrigins.split(",") : []
 	var localOrigin = new URL(config.loginServer).origin
 	whitelist.push(localOrigin)
@@ -32,9 +37,12 @@ async function getLoginSystemRouter(config) {
 		}
 	  }
 	}
- 
-		var connection = await mongoose.connect(config.databaseConnection, {useNewUrlParser: true, useUnifiedTopology: false}) 
-		const model = require('./model_jwt')(database,config)
+ 		// DB SWITCH
+		const database = require('./'+databaseType+'_database');
+		if (databaseType === 'mongodb') {
+			await mongoose.connect(config.databaseConnection, {useNewUrlParser: true, useUnifiedTopology: false}) 
+		}
+		const model = require('./model_jwt_'+databaseType)(database,config) 
 	           
         var oauthServer = new OAuthServer({
           model: model,
@@ -43,9 +51,10 @@ async function getLoginSystemRouter(config) {
           allowEmptyState: true,
           allowExtendedTokenAttributes: true,
         })
-        var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken, validatePassword} = require('./userHelpers')(config) //Object.assign({},config,{oauthServer: oauthServer}))
+        var {sanitizeUser, requestToken, generateToken, loginSuccessJson, requestRefreshToken, validatePassword} = require('./userHelpers')(config, model) //Object.assign({},config,{oauthServer: oauthServer}))
         const {sendWelcomeEmail} = require('./utils')(config)
-            
+        
+		// TODO DB SWITCH    
         var passport = require('./passport')(config,database)
 
         
@@ -55,55 +64,8 @@ async function getLoginSystemRouter(config) {
          *****************************************************/
 
         var utils = require("./utils")(config)
-        var ObjectId = require('mongodb').ObjectID;
-        
-        function createClients() {
-			//console.log(['CREATE AUTH CLIENTS',config.oauthClients])
-			return new Promise(function(resolve,reject) {
-				var promises = []
-				if (Array.isArray(config.oauthClients)) {
-					config.oauthClients.forEach(function(clientConfig) {
-						//console.log(['CREATE AUTH CLIENT',clientConfig.clientId])
-						database.OAuthClient.findOne({clientId: clientConfig.clientId}).then(function(result) {
-							let clientFields = 	{
-								clientId: clientConfig.clientId, 
-								clientSecret:clientConfig.clientSecret,
-								clientName:clientConfig.clientName,
-								clientBy:clientConfig.clientBy,
-								website_url:clientConfig.clientWebsite,
-								redirectUris:clientConfig.redirectUris,
-								clientImage:clientConfig.clientImage
-							};
-							//console.log(clientFields)
-							if (result!= null) {
-								// OK
-								//console.log('CREATE push update');
-								promises.push(database.OAuthClient.update({clientId:clientConfig.clientId},clientFields))
-							} else {
-								//console.log('CREATE push save');
-								let client = new database.OAuthClient(clientFields);
-								promises.push(client.save())
-							}
-							Promise.all(promises).then(function(res) {
-								//console.log(['CREATED AUTH CLIENTS',res])
-								database.OAuthClient.find({}).then(function(foundClients) {
-									//console.log(['CREATED AUTH CLIENTS found',foundClients])
-									resolve()
-								})
-							})
-						}).catch(function(e) {
-							//console.log('CREATE AUTH ERR');
-							console.log(e);
-							resolve()
-						}) 
-					})
-				} else {
-					resolve()
-				}
-				
-			})
-		}
-		await createClients()
+        // ensure oauth clients from config
+		await model.createClients(config.oauthClients)
 		
 		
 		global.Promise = bluebird;
@@ -326,21 +288,22 @@ async function getLoginSystemRouter(config) {
 		 * SIGNUP
 		 ********************/
 		router.post('/signup', cors(corsOptions),function(req, res) {
-			//console.log('/signup')
+			// console.log('/signup',req.body)
 				if (req.body.username && req.body.username.length > 0 && req.body.name && req.body.name.length>0 && req.body.avatar && req.body.avatar.length>0 && req.body.password && req.body.password.length>0 && req.body.password2 && req.body.password2.length>0) {
 				if (!config.allowedUsers || config.allowedUsers.length === 0 ||  (config.allowedUsers.indexOf(req.body.username.trim()) >= 0 )) {
 					
 					var validateResult = validatePassword(req.body.password)
-						//console.log(['VAL,PASS',validateResult,config.passwordRestrictions,req.body.password])
+					// console.log(['VAL,PASS',validateResult,config.passwordRestrictions,req.body.password])
 					if (!validateResult.valid) {
 						res.send({error:validateResult.message});
 					} else if (req.body.password2 != req.body.password)  {
 						res.send({error:'Passwords do not match.'});
 					} else {
-						database.User.findOne({username:req.body.username.trim()}, function(err, ditem) {
-							if (err) console.log(err)
+						model.findUserByUsername(req.body.username.trim()).then(function(ditem) {
+							// console.log(['FINDUSER signup',ditem])
+							//if (err) console.log(err)
 							if (ditem) {
-								res.send({'error':'There is already a user registered with the email address '+req.body.username});
+								res.send({'error':'There is already a user registered as '+req.body.username});
 							} else {
 								let item = {}
 								config.userFields.map(function(fieldName) {
@@ -355,10 +318,10 @@ async function getLoginSystemRouter(config) {
 								//console.log("CHECK AVATAR "+req.body.avatar)
 								//database.User.find({}).then(function(allU) {
 									//console.log(allU)
-									
-									database.User.findOne({avatar:{$eq:req.body.avatar.trim()}}).then(function(avUser) {
-									//	console.log('AVUSER')
-										//console.log(avUser)
+									// console.log(['SIGNUP',item])
+									model.findUserByAvatar(req.body.avatar.trim()).then(function(avUser) {
+										// console.log('AVUSER')
+										// console.log(avUser)
 											if (avUser!=null) {
 												res.send({error:'Avatar name is already taken, try something different.'});
 											} else {
@@ -367,10 +330,9 @@ async function getLoginSystemRouter(config) {
 												item.tmp_password=item.password;
 												item.password='';
 												item.password2='';
-												let user = new database.User(item)
+												// let user = new database.User(item)
 												var linkBase = req.body.linkBase  // optional react router parent path
-  											   
-												user.save().then(function(result2) {
+  											    model.saveUser(item).then(function(user) {
 													res.send(sendWelcomeEmail(item.signup_token,req.body.name,item.username, req.headers.referer ? req.headers.referer : config.loginServer, linkBase));
 												});                                        
 											}
@@ -397,8 +359,8 @@ async function getLoginSystemRouter(config) {
 		router.get('/doconfirm', cors(),function(req,res) {
 			let params = req.query;
 			if (params && params.code && params.code.length > 0) {
-				database.User.findOne({ signup_token:params.code.trim()})
-				.then(function(user)  {
+				//database.User.findOne({ signup_token:params.code.trim()})
+				model.findUserBySignupToken(params.code.trim()).then(function(user) {
 						if (user != null) {
 							if (new Date().getTime() - parseInt(user.signup_token_timestamp,10) < 600000) {
 								
@@ -437,8 +399,7 @@ async function getLoginSystemRouter(config) {
 		 ********************/
 		router.post('/logout',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			if (res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user && res.locals.oauth.token.user._id)  {
-				database.OAuthRefreshToken.deleteMany({user:ObjectId(res.locals.oauth.token.user._id)}).then(function() {
-				})
+				model.deleteRefreshTokensForUser(res.locals.oauth.token.user._id)
 			}
 			res.json({message:'Logged out'})
 		});
@@ -483,7 +444,8 @@ async function getLoginSystemRouter(config) {
 					loginPassword = md5(req.body.password.trim())
 				} 
 				//console.log(['ahax singin',req.body,loginPassword])
-				database.User.findOne({username:req.body.username.trim(),password:loginPassword})
+				// database.User.findOne({username:req.body.username.trim(),password:loginPassword})
+				model.findUserByUsername(req.body.username.trim(),loginPassword)
 				.then(function(user)  {
 						if (user != null) {
 						   loginSuccessJson(user,res,function(err,finalUser) {
@@ -515,10 +477,12 @@ async function getLoginSystemRouter(config) {
 				} else if (req.body.password2 != req.body.password)  {
 					res.send({error:'Passwords do not match.'});
 				} else {
-					database.User.findOne({username:req.body.email}, function(err, user) {
-					  if (err) {
-						  res.send({error:err,here:1});
-					  } else if (user!=null) {
+					model.findUserByUsername(req.body.email.trim()).then(function(user) {
+					//   console.log(['recover',user]);
+					// 	if (err) {
+					// 	  res.send({error:err,here:1});
+					//   } else 
+					  if (user!=null) {
 						  if (config.encryptedPasswords) {
 							  user.tmp_password = md5(req.body.password)
 						  } else {
@@ -527,7 +491,7 @@ async function getLoginSystemRouter(config) {
 						  user.recover_password_token=generateToken(); //req.body.code;
 						  user.recover_password_token_timestamp =  new Date().getTime();
 						  // no update email address, item.username = req.body.username;
-						  user.save().then(function(xres) {
+						  model.saveUser(user).then(function(xres) {
 							  var linkBase = req.body.linkBase  // optional react router parent path
 							   var link = (req.headers.referer ? req.headers.referer : config.loginServer) + '?code='+user.recover_password_token +  '#'+(linkBase ? linkBase : '')+'/dorecover'; 
 							   var mailTemplate = config.recoveryEmailTemplate && config.recoveryEmailTemplate.length > 0 ? config.recoveryEmailTemplate : `<div>Hi {{name}}! <br/>
@@ -574,12 +538,12 @@ async function getLoginSystemRouter(config) {
 		 ********************/
 		router.get('/dorecover',cors(),function(req,res) {
 				let params = req.query;
-				//console.log('params')
-				//console.log(params)
-				  database.User.findOne({ recover_password_token:params.code})
-					.then(function(user)  {
+				// console.log('dorecover params')
+				// console.log(params)
+				//   database.User.findOne({ recover_password_token:params.code})
+				model.findUserByRecoveryToken(params.code).then(function(user) {
 						if (user != null) {
-							//console.log(user)
+							// console.log(user)
 							//console.log(new Date().getTime(), parseInt(user.recover_password_token_timestamp,10))
 						  if (new Date().getTime() - parseInt(user.recover_password_token_timestamp,10) < 600000) {
 							user.password = user.tmp_password;
@@ -587,7 +551,10 @@ async function getLoginSystemRouter(config) {
 							user.recover_password_token_timestamp = undefined;
 							user.tmp_password = undefined;
 							var userId = user._id;
-							  user.save().then(function() {
+							//  user.save().then(function() {
+							// console.log('save user',user)
+							user.save().then(function(xres) {
+								// console.log('saved user')
 								 loginSuccessJson(user,res,function(err,finalUser) {
 									//res.redirect(config.loginSuccessRedirect);
 									if (err) console.log(err);
@@ -630,7 +597,7 @@ async function getLoginSystemRouter(config) {
 		})
 		
 		router.get('/oauthclientspublic', cors(), function(req,res) {
-			console.log(['/oauthclientspublic',config.oauthClients])
+			// console.log(['/oauthclientspublic',config.oauthClients])
 			if (Array.isArray(config.oauthClients)) {
 				res.json(config.oauthClients.map(function(client) {
 					return {
@@ -652,7 +619,8 @@ async function getLoginSystemRouter(config) {
 		 ********************/
 		router.post('/saveuser',cors(corsOptions), oauthServer.authenticate(), function(req, res) {
 			var loginUser = res.locals && res.locals.oauth && res.locals.oauth.token && res.locals.oauth.token.user ? res.locals.oauth.token.user : {}
-			if (req.body._id && req.body._id.length > 0 && loginUser._id && loginUser._id === req.body._id) {
+			// console.log('post save yuser',req.body, loginUser)
+			if (loginUser && (loginUser.is_admin || (req.body.username && req.body.username.length > 0 && loginUser.username && loginUser.username === req.body.username))) {
 				// if password is sent, validate it
 				var passwordOK = true
 				if (req.body.password && req.body.password.length > 0 && req.body.password2 && req.body.password2.length > 0) {
@@ -669,11 +637,12 @@ async function getLoginSystemRouter(config) {
 				}
 				
 				if (passwordOK) {
-					database.User.findOne(ObjectId(req.body._id), function(err, user) {
-						
-					  if (err) {
-						  res.send({error:err});
-					  } else if (user!=null) {
+					//database.User.findOne(ObjectId(req.body._id), function(err, user) {
+					model.findUserByUsername(req.body.username).then(function(user) {	
+					//   if (err) {
+					// 	  res.send({error:err});
+					//   } else 
+					  if (user!=null) {
 						 config.userFields.map(function(fieldName) {
 							let key = fieldName.trim();
 							// don't update username
@@ -691,12 +660,14 @@ async function getLoginSystemRouter(config) {
 						
 						  // update avatar only when changed
 						  if (req.body.avatar && user.avatar != req.body.avatar) {
-							  database.User.findOne({avatar:{$eq:req.body.avatar}}, function(err, avUser) {
+							  //database.User.findOne({avatar:{$eq:req.body.avatar}}, function(err, avUser) {
+								model.findUserByAvatar(req.body.avatar).then(function(avUser) {
 								  if (avUser!=null) {
 									  res.send({error:"Avatar name is already taken, try something different."});
 								  } else {
 									  if (user.username && user.username.length > 0 && user.name && user.name.length>0 && user.avatar && user.avatar.length>0) {
-										  user.save().then(function(res) {
+										  //user.save().then(function(res) {
+										  model.saveUser(user).then(function(savedUser) {
 											  res.send({user, message:"Saved changes"});
 										  });  
 									  } else {
@@ -706,7 +677,8 @@ async function getLoginSystemRouter(config) {
 							  });
 						  } else {
 							  if (user.username && user.username.length > 0 && user.name && user.name.length>0 && user.avatar && user.avatar.length>0) {
-								user.save().then(function(xres) {
+								model.saveUser(user).then(function(savedUser) {
+								//user.save().then(function(xres) {
 								  res.send({user, message:"Saved changes"});
 								});  
 							} else {
@@ -740,7 +712,7 @@ async function getLoginSystemRouter(config) {
 
 		router.use((err, req, res, next) => {
 		  res.status(err.status || 500);
-		  console.log(err);
+		  //console.log(err);
 		  res.json({
 			message: err.message,
 			error: err
